@@ -37,8 +37,7 @@ func New(opts ...Option) (*GTA, error) {
 	return gta, nil
 }
 
-// DirtyPackages uses the differ and packager to build a list of dirty packages
-// where dirty is defined as "changed".
+// DirtyPackages uses the differ and packager to build a list of dirty packages where dirty is defined as "changed".
 func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	if g.differ == nil {
 		return nil, ErrNoDiffer
