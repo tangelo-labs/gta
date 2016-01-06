@@ -1,6 +1,7 @@
 package gta
 
 import (
+	"bufio"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -21,26 +22,23 @@ type Git struct{}
 // Diff returns a set of changed directories
 func (g *Git) Diff() (map[string]bool, error) {
 	// We get the root of the repository to build our full path
-	cmd := []string{"rev-parse", "--show-toplevel"}
-	out, err := exec.Command("git", cmd...).Output()
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return nil, err
 	}
 	root := strings.TrimSpace(string(out))
 
-	// git diff all files from _master_
-	cmd = []string{"diff", "origin/master", "--name-only"}
-	out, err = exec.Command("git", cmd...).Output()
+	cmd := exec.Command("git", "diff", "origin/master", "--name-only")
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
 	}
+	cmd.Start()
 
-	changed := strings.Split(string(out), "\n")
 	dirs := map[string]bool{}
-	for _, filename := range changed {
-		if filename == "" {
-			continue
-		}
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		filename := scanner.Text()
 
 		// we build our full absolute file path
 		full, err := filepath.Abs(filepath.Join(root, filename))
@@ -50,5 +48,5 @@ func (g *Git) Diff() (map[string]bool, error) {
 		dirs[filepath.Dir(full)] = false
 	}
 
-	return dirs, nil
+	return dirs, scanner.Err()
 }
