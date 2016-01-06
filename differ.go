@@ -35,7 +35,9 @@ func (g *Git) Diff() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	cmd.Start()
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
 
 	dirs := map[string]bool{}
 	scanner := bufio.NewScanner(stdout)
@@ -50,5 +52,9 @@ func (g *Git) Diff() (map[string]bool, error) {
 		dirs[filepath.Dir(full)] = false
 	}
 
-	return dirs, scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return dirs, cmd.Wait()
 }
