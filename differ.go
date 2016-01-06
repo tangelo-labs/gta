@@ -3,6 +3,7 @@ package gta
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -48,8 +49,17 @@ func (g *Git) Diff() (map[string]bool, error) {
 		return nil, err
 	}
 
+	dirs, err := diffFileDirectories(root, stdout)
+	if err != nil {
+		return nil, err
+	}
+
+	return dirs, cmd.Wait()
+}
+
+func diffFileDirectories(root string, r io.Reader) (map[string]bool, error) {
 	dirs := map[string]bool{}
-	scanner := bufio.NewScanner(stdout)
+	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
 		filename := scanner.Text()
 
@@ -61,9 +71,5 @@ func (g *Git) Diff() (map[string]bool, error) {
 		dirs[filepath.Dir(full)] = false
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return dirs, cmd.Wait()
+	return dirs, scanner.Err()
 }
