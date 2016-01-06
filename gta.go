@@ -1,3 +1,5 @@
+// Package gta provides a set of utilites to build a set of dirty packages and their dependents
+// that can be used to target code changes.
 package gta
 
 import (
@@ -6,19 +8,19 @@ import (
 )
 
 var (
-	// ErrNoDiffer is returned when there is no differ set on the GTA
+	// ErrNoDiffer is returned when there is no differ set on the GTA.
 	ErrNoDiffer = errors.New("there is no differ set")
-	// ErrNoPackager is returned when there is no packager set on the GTA
+	// ErrNoPackager is returned when there is no packager set on the GTA.
 	ErrNoPackager = errors.New("there is no packager set")
 )
 
-// GTA
+// A GTA provides a method of building dirty packages, and their dependent packages.
 type GTA struct {
 	differ   Differ
 	packager Packager
 }
 
-// New returns a new GTA with various options passed in
+// New returns a new GTA with various options passed to New.
 func New(opts ...Option) (*GTA, error) {
 	gta := &GTA{}
 
@@ -36,7 +38,7 @@ func New(opts ...Option) (*GTA, error) {
 }
 
 // DirtyPackages uses the differ and packager to build a list of dirty packages
-// where dirty is defined as "changed"
+// where dirty is defined as "changed".
 func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	if g.differ == nil {
 		return nil, ErrNoDiffer

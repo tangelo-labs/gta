@@ -1,9 +1,9 @@
 package gta
 
-// Option is an option function
+// Option is an option function used to modify a GTA.
 type Option func(*GTA) error
 
-// SetDiffer sets a differ on a GTA
+// SetDiffer sets a differ on a GTA.
 func SetDiffer(d Differ) Option {
 	return func(g *GTA) error {
 		g.differ = d
@@ -11,7 +11,7 @@ func SetDiffer(d Differ) Option {
 	}
 }
 
-// SetPackager sets a packager on a GTA
+// SetPackager sets a packager on a GTA.
 func SetPackager(p Packager) Option {
 	return func(g *GTA) error {
 		g.packager = p

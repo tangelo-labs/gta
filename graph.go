@@ -1,11 +1,11 @@
 package gta
 
-// Graph is an adjacency list representation of a graph using maps
+// Graph is an adjacency list representation of a graph using maps.
 type Graph struct {
 	graph map[string]map[string]bool
 }
 
-// Traverse is a a simple recurisve depth first traversal of a directed cyclic graph
+// Traverse is a a simple recurisve depth first traversal of a directed cyclic graph.
 func (g *Graph) Traverse(node string, ref *map[string]bool) {
 	mark := *ref
 	// we've already visited this node

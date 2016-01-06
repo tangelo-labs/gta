@@ -1,6 +1,5 @@
-GTA: Go Test Auto
+gta: go test auto
 ================
+`gta` builds a list of "dirty" (changed) packages from master, using git.
 
-Run `gta` which builds a list of dirty packages from master using git
-
-GTA works by implementing a various set of interfaces, namely the Differ and Packager interfaces
+`gta` works by implementing a various set of interfaces, namely the `Differ` and `Packager` interfaces.
