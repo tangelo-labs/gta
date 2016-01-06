@@ -1,12 +1,24 @@
 package gta
 
 import (
-	"errors"
+	"fmt"
 	"go/build"
 
 	"golang.org/x/tools/refactor/importgraph"
 )
 
+// GraphError is a collection of errors from attempting to build the
+// dependent graph
+type GraphError struct {
+	Errors map[string]error
+}
+
+// Error implements the error interface for GraphError
+func (g *GraphError) Error() string {
+	return fmt.Sprintf("errors while generating import graph: %v", g.Errors)
+}
+
+// Packager interface defines a set of means to access golang build Package information
 type Packager interface {
 	// Get a go package from directory
 	PackageFromDir(string) (*build.Package, error)
@@ -20,6 +32,7 @@ type Packager interface {
 // verify DefaultPackager implements the the Packager interface
 var _ Packager = DefaultPackager
 
+// DefaultPackager is the default instance of PackageContext
 var DefaultPackager = &PackageContext{
 	ctx: &build.Default,
 }
@@ -43,7 +56,7 @@ func (p *PackageContext) PackageFromImport(importPath string) (*build.Package, e
 func (p *PackageContext) DependentGraph() (*Graph, error) {
 	_, graph, errs := importgraph.Build(p.ctx)
 	if len(errs) != 0 {
-		return nil, errors.New("error generating graph")
+		return nil, &GraphError{Errors: errs}
 	}
 
 	return &Graph{graph: graph}, nil
