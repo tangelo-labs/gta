@@ -5,6 +5,7 @@ package gta
 import (
 	"errors"
 	"go/build"
+	"sort"
 )
 
 var (
@@ -92,5 +93,12 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 		packages = append(packages, pkg)
 	}
 
+	sort.Sort(byPackageImportPath(packages))
 	return packages, nil
 }
+
+type byPackageImportPath []*build.Package
+
+func (b byPackageImportPath) Len() int               { return len(b) }
+func (b byPackageImportPath) Less(i int, j int) bool { return b[i].ImportPath < b[j].ImportPath }
+func (b byPackageImportPath) Swap(i int, j int)      { b[i], b[j] = b[j], b[i] }
