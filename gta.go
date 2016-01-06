@@ -79,7 +79,7 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 
 	for change := range changed {
 		// we traverse the graph and build our list of mark all dependents
-		graph.Traverse(change, &marked)
+		graph.Traverse(change, marked)
 	}
 
 	// build our packages

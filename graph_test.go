@@ -9,7 +9,6 @@ func TestGraphTraversal(t *testing.T) {
 	tests := []struct {
 		graph   *Graph
 		start   string
-		got     map[string]bool
 		want    map[string]bool
 		comment string
 	}{
@@ -26,7 +25,6 @@ func TestGraphTraversal(t *testing.T) {
 				},
 			},
 			start: "C",
-			got:   map[string]bool{},
 			want: map[string]bool{
 				"A": true,
 				"B": true,
@@ -46,7 +44,6 @@ func TestGraphTraversal(t *testing.T) {
 				},
 			},
 			start: "B",
-			got:   map[string]bool{},
 			want: map[string]bool{
 				"A": true,
 				"B": true,
@@ -56,11 +53,12 @@ func TestGraphTraversal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Log(tt.comment)
-		tt.graph.Traverse(tt.start, &tt.got)
-		if !reflect.DeepEqual(tt.want, tt.got) {
+		got := map[string]bool{}
+		tt.graph.Traverse(tt.start, got)
+		if !reflect.DeepEqual(tt.want, got) {
 			t.Error("expected want and got to be equal")
 			t.Errorf("want: %v", tt.want)
-			t.Errorf(" got: %v", tt.got)
+			t.Errorf(" got: %v", got)
 		}
 	}
 }

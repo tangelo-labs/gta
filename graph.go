@@ -6,8 +6,7 @@ type Graph struct {
 }
 
 // Traverse is a a simple recurisve depth first traversal of a directed cyclic graph.
-func (g *Graph) Traverse(node string, ref *map[string]bool) {
-	mark := *ref
+func (g *Graph) Traverse(node string, mark map[string]bool) {
 	// we've already visited this node
 	if visited, ok := mark[node]; visited && ok {
 		return
@@ -17,7 +16,7 @@ func (g *Graph) Traverse(node string, ref *map[string]bool) {
 
 	if edges, ok := g.graph[node]; ok {
 		for edge := range edges {
-			g.Traverse(edge, ref)
+			g.Traverse(edge, mark)
 		}
 	}
 
