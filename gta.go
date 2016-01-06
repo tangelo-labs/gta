@@ -22,10 +22,10 @@ type GTA struct {
 
 // New returns a new GTA with various options passed to New.
 func New(opts ...Option) (*GTA, error) {
-	gta := &GTA{}
-
-	gta.differ = &Git{}
-	gta.packager = DefaultPackager
+	gta := &GTA{
+		differ:   &Git{},
+		packager: DefaultPackager,
+	}
 
 	for _, opt := range opts {
 		err := opt(gta)
