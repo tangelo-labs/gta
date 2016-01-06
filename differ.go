@@ -2,6 +2,7 @@ package gta
 
 import (
 	"bufio"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -23,14 +24,22 @@ type Git struct{}
 
 // Diff returns a set of changed directories.
 func (g *Git) Diff() (map[string]bool, error) {
+	// We get the current git sha
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return nil, err
+	}
+	sha := strings.TrimSpace(string(out))
+
 	// We get the root of the repository to build our full path.
-	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	out, err = exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
 		return nil, err
 	}
 	root := strings.TrimSpace(string(out))
 
-	cmd := exec.Command("git", "diff", "origin/master", "--name-only")
+	arg := fmt.Sprintf("origin/master...%s", sha)
+	cmd := exec.Command("git", "diff", arg, "--name-only")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err

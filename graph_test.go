@@ -49,6 +49,30 @@ func TestGraphTraversal(t *testing.T) {
 				"B": true,
 			},
 		},
+		{
+			comment: "A depends on B depends on C depends on D, E depends on C, C and E dirty, so we expect all of them to be marked but D",
+			graph: &Graph{
+				graph: map[string]map[string]bool{
+					"D": map[string]bool{
+						"C": true,
+					},
+					"C": map[string]bool{
+						"B": true,
+						"E": true,
+					},
+					"B": map[string]bool{
+						"A": true,
+					},
+				},
+			},
+			start: "C",
+			want: map[string]bool{
+				"A": true,
+				"B": true,
+				"C": true,
+				"E": true,
+			},
+		},
 	}
 
 	for _, tt := range tests {
