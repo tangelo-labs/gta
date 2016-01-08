@@ -58,6 +58,11 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	for dir := range dirs {
 		pkg, err := g.packager.PackageFromDir(dir)
 		if err != nil {
+			if _, ok := err.(*build.NoGoError); ok {
+				// there are no buildable go files in this directory
+				// so no dirty packges
+				continue
+			}
 			return nil, err
 		}
 
