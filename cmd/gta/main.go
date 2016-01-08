@@ -4,6 +4,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"go/build"
 	"log"
@@ -16,6 +17,9 @@ import (
 )
 
 func main() {
+	include := flag.String("include", "doge/,services/,tools/,exp/", "include a set of comma separated prefixes on the output")
+	flag.Parse()
+
 	gt, err := gta.New()
 	if err != nil {
 		log.Panic(err)
@@ -24,7 +28,8 @@ func main() {
 	if err != nil {
 		log.Panic(err)
 	}
-	strung := stringify(pkgs)
+
+	strung := stringify(pkgs, strings.Split(*include, ","))
 
 	if terminal.IsTerminal(syscall.Stdin) {
 		for _, pkg := range strung {
@@ -36,10 +41,15 @@ func main() {
 	fmt.Println(strings.Join(strung, " "))
 }
 
-func stringify(pkgs []*build.Package) []string {
-	out := make([]string, len(pkgs))
-	for i, pkg := range pkgs {
-		out[i] = pkg.ImportPath
+func stringify(pkgs []*build.Package, included []string) []string {
+	var out []string
+	for _, pkg := range pkgs {
+		for _, include := range included {
+			if strings.HasPrefix(pkg.ImportPath, include) {
+				out = append(out, pkg.ImportPath)
+				break
+			}
+		}
 	}
 	return out
 }
