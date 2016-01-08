@@ -22,13 +22,21 @@ var _ Packager = &testPackager{}
 type testPackager struct {
 	dirs2Imports map[string]string
 	graph        *Graph
+	errs         map[string]error
 }
 
 func (t *testPackager) PackageFromDir(a string) (*build.Package, error) {
+	// we pass back an err
+	err, eok := t.errs[a]
+	if eok {
+		return nil, err
+	}
+
 	path, ok := t.dirs2Imports[a]
 	if !ok {
 		return nil, errors.New("dir not found")
 	}
+
 	return &build.Package{
 		ImportPath: path,
 	}, nil
@@ -76,12 +84,49 @@ func TestGTA(t *testing.T) {
 			"dirC": "C",
 		},
 		graph: graph,
+		errs:  make(map[string]error),
 	}
 	want := []*build.Package{
 		&build.Package{ImportPath: "A"},
 		&build.Package{ImportPath: "B"},
 		&build.Package{ImportPath: "C"},
 	}
+
+	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := gta.DirtyPackages()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %v", want)
+		t.Errorf(" got: %v", got)
+		t.Fatal("expected want and got to be equal")
+	}
+}
+
+func TestNoBuildableGoFiles(t *testing.T) {
+	// we have changes but they don't belong to any dirty golang files, so no dirty packages
+	const dir = "docs"
+	difr := &testDiffer{
+		diff: map[string]bool{
+			dir: false,
+		},
+	}
+
+	pkgr := &testPackager{
+		errs: map[string]error{
+			dir: &build.NoGoError{
+				Dir: dir,
+			},
+		},
+	}
+
+	var want []*build.Package
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
 	if err != nil {
