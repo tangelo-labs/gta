@@ -3,6 +3,7 @@ package gta
 import (
 	"bufio"
 	"io"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -46,7 +47,14 @@ func (g *Git) Diff() (map[string]bool, error) {
 		return nil, err
 	}
 
-	return dirs, cmd.Wait()
+	existsDirs := map[string]bool{}
+	for dir := range dirs {
+		if exists(dir) {
+			existsDirs[dir] = false
+		}
+	}
+
+	return existsDirs, cmd.Wait()
 }
 
 func diffFileDirectories(root string, r io.Reader) (map[string]bool, error) {
@@ -64,4 +72,11 @@ func diffFileDirectories(root string, r io.Reader) (map[string]bool, error) {
 	}
 
 	return dirs, scanner.Err()
+}
+
+func exists(path string) bool {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return false
+	}
+	return true
 }
