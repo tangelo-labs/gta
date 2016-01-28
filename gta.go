@@ -4,6 +4,7 @@ package gta
 
 import (
 	"errors"
+	"fmt"
 	"go/build"
 	"sort"
 )
@@ -50,7 +51,7 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	// get our diff'd directories
 	dirs, err := g.differ.Diff()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("diffing directory for dirty packages, %v", err)
 	}
 
 	// we build our set of initial dirty packages from the git diff
@@ -63,7 +64,7 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 				// so no dirty packges
 				continue
 			}
-			return nil, err
+			return nil, fmt.Errorf("pulling package information for %q, %v", dir, err)
 		}
 
 		// we create a simple set of changed pkgs by import path
@@ -73,7 +74,7 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	// we build the dependent graph
 	graph, err := g.packager.DependentGraph()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("building dependency graph, %v", err)
 	}
 
 	// we copy the map since iterating over a map

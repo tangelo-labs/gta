@@ -22,11 +22,11 @@ func main() {
 
 	gt, err := gta.New()
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 	pkgs, err := gt.DirtyPackages()
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	strung := stringify(pkgs, strings.Split(*include, ","))
