@@ -144,3 +144,60 @@ func TestNoBuildableGoFiles(t *testing.T) {
 		t.Fatal("expected want and got to be equal")
 	}
 }
+
+func TestSpecialCaseDirectory(t *testing.T) {
+	// We want to ignore the special case directory "testdata"
+	const special = "specia/case/testdata"
+	difr := &testDiffer{
+		diff: map[string]bool{
+			special: false, // this
+			"dirC":  false,
+		},
+	}
+	graph := &Graph{
+		graph: map[string]map[string]bool{
+			"C": map[string]bool{
+				"B": true,
+			},
+			"B": map[string]bool{
+				"A": true,
+			},
+		},
+	}
+
+	pkgr := &testPackager{
+		dirs2Imports: map[string]string{
+			"dirA": "A",
+			"dirB": "B",
+			"dirC": "C",
+		},
+		graph: graph,
+		errs: map[string]error{
+			special: &build.NoGoError{
+				Dir: special,
+			},
+		},
+	}
+
+	want := []*build.Package{
+		&build.Package{ImportPath: "A"},
+		&build.Package{ImportPath: "B"},
+		&build.Package{ImportPath: "C"},
+	}
+
+	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := gta.DirtyPackages()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %v", want)
+		t.Errorf(" got: %v", got)
+		t.Fatal("expected want and got to be equal")
+	}
+}

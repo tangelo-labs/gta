@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
+	"path/filepath"
 	"sort"
 )
 
@@ -57,6 +58,13 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	// we build our set of initial dirty packages from the git diff
 	changed := make(map[string]bool)
 	for dir := range dirs {
+		// Avoid .foo, _foo, and testdata directory trees how the go tool does!
+		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
+		// Above link is not guranteed to work.
+		base := filepath.Base(dir)
+		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" {
+			continue
+		}
 		pkg, err := g.packager.PackageFromDir(dir)
 		if err != nil {
 			if _, ok := err.(*build.NoGoError); ok {
