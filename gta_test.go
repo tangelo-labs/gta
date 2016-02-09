@@ -147,11 +147,15 @@ func TestNoBuildableGoFiles(t *testing.T) {
 
 func TestSpecialCaseDirectory(t *testing.T) {
 	// We want to ignore the special case directory "testdata"
-	const special = "specia/case/testdata"
+	const (
+		special1 = "specia/case/testdata"
+		special2 = "specia/case/testdata/multi"
+	)
 	difr := &testDiffer{
 		diff: map[string]bool{
-			special: false, // this
-			"dirC":  false,
+			special1: false, // this
+			special2: false,
+			"dirC":   false,
 		},
 	}
 	graph := &Graph{
@@ -173,8 +177,11 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		},
 		graph: graph,
 		errs: map[string]error{
-			special: &build.NoGoError{
-				Dir: special,
+			special1: &build.NoGoError{
+				Dir: special1,
+			},
+			special2: &build.NoGoError{
+				Dir: special2,
 			},
 		},
 	}

@@ -17,16 +17,17 @@ import (
 )
 
 func main() {
+	log.SetFlags(log.Lshortfile | log.Ltime)
 	include := flag.String("include", "doge/,services/,tools/,exp/", "include a set of comma separated prefixes on the output")
 	flag.Parse()
 
 	gt, err := gta.New()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("can't prepare gta: %v", err)
 	}
 	pkgs, err := gt.DirtyPackages()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("can't list dirty packages: %v", err)
 	}
 
 	strung := stringify(pkgs, strings.Split(*include, ","))

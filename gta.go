@@ -62,7 +62,8 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
 		// Above link is not guranteed to work.
 		base := filepath.Base(dir)
-		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" {
+		parent := filepath.Base(filepath.Dir(dir))
+		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" || parent == "testdata" {
 			continue
 		}
 		pkg, err := g.packager.PackageFromDir(dir)
@@ -74,7 +75,6 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 			}
 			return nil, fmt.Errorf("pulling package information for %q, %v", dir, err)
 		}
-
 		// we create a simple set of changed pkgs by import path
 		changed[pkg.ImportPath] = false
 	}
@@ -102,7 +102,12 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 	for path := range marked {
 		pkg, err := g.packager.PackageFromImport(path)
 		if err != nil {
-			return nil, err
+			if _, ok := err.(*build.NoGoError); ok {
+				// there are no buildable go files in this directory
+				// so no dirty packges
+				continue
+			}
+			return nil, fmt.Errorf("building packages for %q: %v", path, err)
 		}
 		packages = append(packages, pkg)
 	}
