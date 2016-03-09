@@ -18,7 +18,7 @@ import (
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
-	include := flag.String("include", "doge/,services/,tools/,exp/", "include a set of comma separated prefixes on the output")
+	include := flag.String("include", "doge/,services/,teams/,tools/,exp/", "include a set of comma separated prefixes on the output")
 	flag.Parse()
 
 	gt, err := gta.New()
