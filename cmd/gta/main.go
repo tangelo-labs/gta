@@ -25,9 +25,13 @@ func init() {
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
 	include := flag.String("include", "doge/,services/,teams/,tools/,exp/", "include a set of comma separated prefixes on the output")
+	merge := flag.Bool("merge", false, "diff using the latest merge commit")
 	flag.Parse()
 
-	gt, err := gta.New()
+	differ := &gta.Git{
+		UseMergeCommit: *merge,
+	}
+	gt, err := gta.New(gta.SetDiffer(differ))
 	if err != nil {
 		log.Fatalf("can't prepare gta: %v", err)
 	}

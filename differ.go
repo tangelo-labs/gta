@@ -2,6 +2,7 @@ package gta
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -21,7 +22,9 @@ type Differ interface {
 var _ Differ = &Git{}
 
 // Git implements the Differ interface using a git version control method.
-type Git struct{}
+type Git struct {
+	UseMergeCommit bool
+}
 
 // Diff returns a set of changed directories.
 func (g *Git) Diff() (map[string]bool, error) {
@@ -32,7 +35,23 @@ func (g *Git) Diff() (map[string]bool, error) {
 	}
 	root := strings.TrimSpace(string(out))
 
-	cmd := exec.Command("git", "diff", "origin/master...HEAD", "--name-only")
+	parent1 := "origin/master"
+	parent2 := "HEAD"
+	if g.UseMergeCommit {
+		out, err := exec.Command("git", "log", "-1", "--merges", "--pretty=format:%p").Output()
+		if err != nil {
+			return nil, err
+		}
+		parents := strings.TrimSpace(string(out))
+		parentSplit := strings.Split(parents, " ")
+		if len(parentSplit) != 2 {
+			return nil, fmt.Errorf("could not discover parent merge commits")
+		}
+		parent1 = parentSplit[0]
+		parent2 = parentSplit[1]
+	}
+
+	cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only")
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, err
