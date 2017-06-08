@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
+	"go/scanner"
 	"path/filepath"
 	"sort"
 )
@@ -70,9 +71,14 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 		if err != nil {
 			if _, ok := err.(*build.NoGoError); ok {
 				// there are no buildable go files in this directory
-				// so no dirty packges
+				// so no dirty packages
 				continue
 			}
+			if _, ok := err.(scanner.ErrorList); ok {
+				// same, package is not buildable, so no dirty packages
+				continue
+			}
+
 			return nil, fmt.Errorf("pulling package information for %q, %v", dir, err)
 		}
 		// we create a simple set of changed pkgs by import path
