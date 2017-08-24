@@ -109,6 +109,96 @@ func TestGTA(t *testing.T) {
 	}
 }
 
+func TestGTA_ChangedPackages(t *testing.T) {
+	// A depends on B depends on C
+	// D depends on B
+	// E depends on F depends on G
+
+	difr := &testDiffer{
+		diff: map[string]bool{
+			"dirC": false,
+			"dirH": false,
+		},
+	}
+
+	graph := &Graph{
+		graph: map[string]map[string]bool{
+			"C": map[string]bool{
+				"B": true,
+			},
+			"B": map[string]bool{
+				"A": true,
+				"D": true,
+			},
+			"G": map[string]bool{
+				"F": true,
+			},
+			"F": map[string]bool{
+				"E": true,
+			},
+		},
+	}
+
+	pkgr := &testPackager{
+		dirs2Imports: map[string]string{
+			"dirA": "A",
+			"dirB": "B",
+			"dirC": "C",
+			"dirD": "D",
+			"dirF": "E",
+			"dirG": "F",
+			"dirH": "G",
+		},
+		graph: graph,
+		errs:  make(map[string]error),
+	}
+
+	want := &Packages{
+		Dependencies: map[string][]*build.Package{
+			"C": []*build.Package{
+				{ImportPath: "A"},
+				{ImportPath: "B"},
+				{ImportPath: "C"},
+				{ImportPath: "D"},
+			},
+			"G": []*build.Package{
+				{ImportPath: "E"},
+				{ImportPath: "F"},
+				{ImportPath: "G"},
+			},
+		},
+		Changes: []*build.Package{
+			{ImportPath: "C"},
+			{ImportPath: "G"},
+		},
+		AllChanges: []*build.Package{
+			{ImportPath: "A"},
+			{ImportPath: "B"},
+			{ImportPath: "C"},
+			{ImportPath: "D"},
+			{ImportPath: "E"},
+			{ImportPath: "F"},
+			{ImportPath: "G"},
+		},
+	}
+
+	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := gta.ChangedPackages()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %+v", want)
+		t.Errorf(" got: %+v", got)
+		t.Fatal("expected want and got to be equal")
+	}
+}
+
 func TestNoBuildableGoFiles(t *testing.T) {
 	// we have changes but they don't belong to any dirty golang files, so no dirty packages
 	const dir = "docs"

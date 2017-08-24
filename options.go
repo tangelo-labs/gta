@@ -18,3 +18,11 @@ func SetPackager(p Packager) Option {
 		return nil
 	}
 }
+
+// SetPrefixes sets a list of prefix to be included
+func SetPrefixes(prefixes ...string) Option {
+	return func(g *GTA) error {
+		g.prefixes = prefixes
+		return nil
+	}
+}

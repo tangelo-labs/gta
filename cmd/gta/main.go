@@ -4,10 +4,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"go/build"
 	"log"
+	"os"
 	"strings"
 	"syscall"
 
@@ -24,23 +26,43 @@ func init() {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
-	include := flag.String("include", "do/doge/,do/services/,do/teams/,do/tools/,do/exp/", "include a set of comma separated prefixes on the output")
+	include := flag.String("include", "do/doge/,do/services/,do/teams/,do/tools/,do/exp/",
+		"include a set of comma separated prefixes on the output")
 	merge := flag.Bool("merge", false, "diff using the latest merge commit")
+	flagJSON := flag.Bool("json", false, "output list of changes as json")
 	flag.Parse()
 
-	differ := &gta.Git{
-		UseMergeCommit: *merge,
+	options := []gta.Option{
+		gta.SetDiffer(&gta.Git{
+			UseMergeCommit: *merge,
+		}),
+		gta.SetPrefixes(strings.Split(*include, ",")...),
 	}
-	gt, err := gta.New(gta.SetDiffer(differ))
+
+	gt, err := gta.New(options...)
 	if err != nil {
 		log.Fatalf("can't prepare gta: %v", err)
 	}
+
+	if *flagJSON {
+		packages, err := gt.ChangedPackages()
+		if err != nil {
+			log.Fatalf("can't list dirty packages: %v", err)
+		}
+
+		err = json.NewEncoder(os.Stdout).Encode(packages)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	pkgs, err := gt.DirtyPackages()
 	if err != nil {
 		log.Fatalf("can't list dirty packages: %v", err)
 	}
 
-	strung := stringify(pkgs, strings.Split(*include, ","))
+	strung := stringify(pkgs)
 
 	if terminal.IsTerminal(syscall.Stdin) {
 		for _, pkg := range strung {
@@ -52,15 +74,10 @@ func main() {
 	fmt.Println(strings.Join(strung, " "))
 }
 
-func stringify(pkgs []*build.Package, included []string) []string {
+func stringify(pkgs []*build.Package) []string {
 	var out []string
 	for _, pkg := range pkgs {
-		for _, include := range included {
-			if strings.HasPrefix(pkg.ImportPath, include) {
-				out = append(out, pkg.ImportPath)
-				break
-			}
-		}
+		out = append(out, pkg.ImportPath)
 	}
 	return out
 }

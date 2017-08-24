@@ -3,12 +3,14 @@
 package gta
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"go/build"
 	"go/scanner"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 var (
@@ -18,10 +20,39 @@ var (
 	ErrNoPackager = errors.New("there is no packager set")
 )
 
-// A GTA provides a method of building dirty packages, and their dependent packages.
+// Packages contains various detailed information about the structure of
+// packages GTA has detected.
+type Packages struct {
+	// Dependencies contains a map of changed packages to their dependencies
+	Dependencies map[string][]*build.Package
+
+	// Changes represents the changed files
+	Changes []*build.Package
+
+	// AllChanges represents all packages that are dirty including the initial
+	// changed packages
+	AllChanges []*build.Package
+}
+
+// MarshalJSON implements the json.Marshaler interface.
+func (p *Packages) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Dependencies map[string][]string `json:"dependencies,omitempty"`
+		Changes      []string            `json:"changes,omitempty"`
+		AllChanges   []string            `json:"all_changes,omitempty"`
+	}{
+		Dependencies: mapify(p.Dependencies),
+		Changes:      stringify(p.Changes),
+		AllChanges:   stringify(p.AllChanges),
+	})
+}
+
+// A GTA provides a method of building dirty packages, and their dependent
+// packages.
 type GTA struct {
 	differ   Differ
 	packager Packager
+	prefixes []string
 }
 
 // New returns a new GTA with various options passed to New.
@@ -41,8 +72,115 @@ func New(opts ...Option) (*GTA, error) {
 	return gta, nil
 }
 
-// DirtyPackages uses the differ and packager to build a list of dirty packages where dirty is defined as "changed".
+// DirtyPackages uses the differ and packager to build a list of dirty packages
+// where dirty is defined as "changed".
 func (g *GTA) DirtyPackages() ([]*build.Package, error) {
+	paths, err := g.markedPackages()
+	if err != nil {
+		return nil, err
+	}
+
+	// build our packages
+	var packages []*build.Package
+	isAdded := map[string]bool{}
+
+	for _, marked := range paths {
+		for path := range marked {
+			pkg, err := g.packager.PackageFromImport(path)
+			if err != nil {
+				if _, ok := err.(*build.NoGoError); ok {
+					// there are no buildable go files in this directory
+					// so no dirty packges
+					continue
+				}
+				return nil, fmt.Errorf("building packages for %q: %v", path, err)
+			}
+
+			if !isAdded[pkg.ImportPath] {
+				packages = append(packages, pkg)
+				isAdded[pkg.ImportPath] = true
+			}
+		}
+	}
+
+	sort.Sort(byPackageImportPath(packages))
+	return packages, nil
+}
+
+// ChangedPackages uses the differ and packager to build a map of changed root
+// packages to their dependent packages where dependent is defined as "changed"
+// as well due their dependency to the changed packages. It returns the
+// dependency graph, the changes differ detected and a set of all unique
+// packages (including the changes).
+//
+// As an example: package "foo" is imported by packages "bar" and "qux". If
+// "foo" has changed, it has two dependent packages, "bar" and "qux". The
+// result would be then:
+//
+//   Dependencies = {"foo": ["bar", "qux"]}
+//   Changes      = ["foo"]
+//   AllChanges   = ["foo", "bar", "qux]
+//
+// Note that two different changed package might have the same dependent
+// package. Below you see that both "foo" and "foo2" has changed. Each have
+// "bar" because "bar" imports both "foo" and "foo2", i.e:
+//
+//   Dependencies = {"foo": ["bar", "qux"], "foo2" : ["afa", "bar", "qux"]}
+//   Changes      = ["foo", "foo2"]
+//   AllChanges   = ["foo", "foo2", "afa", "bar", "qux]
+//
+// If you want to get a set of unique dirty packages use DirtyPackages() (same
+// as .AllChanges)
+func (g *GTA) ChangedPackages() (*Packages, error) {
+	paths, err := g.markedPackages()
+	if err != nil {
+		return nil, err
+	}
+
+	cp := &Packages{
+		Dependencies: map[string][]*build.Package{},
+		Changes:      []*build.Package{},
+		AllChanges:   []*build.Package{},
+	}
+
+	// build our packages
+	allChanges := map[string]*build.Package{}
+	for changed, marked := range paths {
+		var packages []*build.Package
+
+		for path := range marked {
+			pkg, err := g.packager.PackageFromImport(path)
+			if err != nil {
+				if _, ok := err.(*build.NoGoError); ok {
+					// there are no buildable go files in this directory
+					// so no dirty packges
+					continue
+				}
+				return nil, fmt.Errorf("building packages for %q: %v", path, err)
+			}
+
+			allChanges[pkg.ImportPath] = pkg
+			if changed == pkg.ImportPath {
+				cp.Changes = append(cp.Changes, pkg)
+			}
+			packages = append(packages, pkg)
+		}
+
+		sort.Sort(byPackageImportPath(packages))
+
+		cp.Dependencies[changed] = packages
+	}
+
+	for _, pkg := range allChanges {
+		cp.AllChanges = append(cp.AllChanges, pkg)
+	}
+	sort.Sort(byPackageImportPath(cp.AllChanges))
+	sort.Sort(byPackageImportPath(cp.Changes))
+
+	return cp, nil
+}
+
+func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 	if g.differ == nil {
 		return nil, ErrNoDiffer
 	}
@@ -67,6 +205,7 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" || parent == "testdata" {
 			continue
 		}
+
 		pkg, err := g.packager.PackageFromDir(dir)
 		if err != nil {
 			if _, ok := err.(*build.NoGoError); ok {
@@ -81,8 +220,17 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 
 			return nil, fmt.Errorf("pulling package information for %q, %v", dir, err)
 		}
+
 		// we create a simple set of changed pkgs by import path
-		changed[pkg.ImportPath] = false
+		if len(g.prefixes) != 0 {
+			for _, include := range g.prefixes {
+				if strings.HasPrefix(pkg.ImportPath, include) {
+					changed[pkg.ImportPath] = false
+				}
+			}
+		} else {
+			changed[pkg.ImportPath] = false
+		}
 	}
 
 	// we build the dependent graph
@@ -91,35 +239,16 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 		return nil, fmt.Errorf("building dependency graph, %v", err)
 	}
 
-	// we copy the map since iterating over a map
-	// while its being mutated is undefined behavior
-	marked := make(map[string]bool)
-	for k, v := range changed {
-		marked[k] = v
-	}
-
+	paths := map[string]map[string]bool{}
 	for change := range changed {
+		marked := make(map[string]bool)
+
 		// we traverse the graph and build our list of mark all dependents
 		graph.Traverse(change, marked)
+		paths[change] = marked
 	}
 
-	// build our packages
-	var packages []*build.Package
-	for path := range marked {
-		pkg, err := g.packager.PackageFromImport(path)
-		if err != nil {
-			if _, ok := err.(*build.NoGoError); ok {
-				// there are no buildable go files in this directory
-				// so no dirty packges
-				continue
-			}
-			return nil, fmt.Errorf("building packages for %q: %v", path, err)
-		}
-		packages = append(packages, pkg)
-	}
-
-	sort.Sort(byPackageImportPath(packages))
-	return packages, nil
+	return paths, nil
 }
 
 type byPackageImportPath []*build.Package
@@ -127,3 +256,19 @@ type byPackageImportPath []*build.Package
 func (b byPackageImportPath) Len() int               { return len(b) }
 func (b byPackageImportPath) Less(i int, j int) bool { return b[i].ImportPath < b[j].ImportPath }
 func (b byPackageImportPath) Swap(i int, j int)      { b[i], b[j] = b[j], b[i] }
+
+func stringify(pkgs []*build.Package) []string {
+	var out []string
+	for _, pkg := range pkgs {
+		out = append(out, pkg.ImportPath)
+	}
+	return out
+}
+
+func mapify(pkgs map[string][]*build.Package) map[string][]string {
+	out := map[string][]string{}
+	for key, pkgs := range pkgs {
+		out[key] = stringify(pkgs)
+	}
+	return out
+}
