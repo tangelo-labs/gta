@@ -96,9 +96,24 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 				return nil, fmt.Errorf("building packages for %q: %v", path, err)
 			}
 
-			if !isAdded[pkg.ImportPath] {
-				packages = append(packages, pkg)
+			if isAdded[pkg.ImportPath] {
+				continue
+			}
+
+			addPackage := func() {
 				isAdded[pkg.ImportPath] = true
+				packages = append(packages, pkg)
+
+			}
+
+			if len(g.prefixes) != 0 {
+				for _, include := range g.prefixes {
+					if strings.HasPrefix(pkg.ImportPath, include) {
+						addPackage()
+					}
+				}
+			} else {
+				addPackage()
 			}
 		}
 	}
@@ -159,16 +174,29 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 				return nil, fmt.Errorf("building packages for %q: %v", path, err)
 			}
 
-			allChanges[pkg.ImportPath] = pkg
-			if changed == pkg.ImportPath {
-				cp.Changes = append(cp.Changes, pkg)
+			addPackage := func() {
+				allChanges[pkg.ImportPath] = pkg
+				if changed == pkg.ImportPath {
+					cp.Changes = append(cp.Changes, pkg)
+				}
+				packages = append(packages, pkg)
 			}
-			packages = append(packages, pkg)
+
+			if len(g.prefixes) != 0 {
+				for _, include := range g.prefixes {
+					if strings.HasPrefix(pkg.ImportPath, include) {
+						addPackage()
+					}
+				}
+			} else {
+				addPackage()
+			}
 		}
 
-		sort.Sort(byPackageImportPath(packages))
-
-		cp.Dependencies[changed] = packages
+		if len(packages) != 0 {
+			sort.Sort(byPackageImportPath(packages))
+			cp.Dependencies[changed] = packages
+		}
 	}
 
 	for _, pkg := range allChanges {
@@ -222,15 +250,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		}
 
 		// we create a simple set of changed pkgs by import path
-		if len(g.prefixes) != 0 {
-			for _, include := range g.prefixes {
-				if strings.HasPrefix(pkg.ImportPath, include) {
-					changed[pkg.ImportPath] = false
-				}
-			}
-		} else {
-			changed[pkg.ImportPath] = false
-		}
+		changed[pkg.ImportPath] = false
 	}
 
 	// we build the dependent graph

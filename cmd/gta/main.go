@@ -26,8 +26,9 @@ func init() {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
-	include := flag.String("include", "do/doge/,do/services/,do/teams/,do/tools/,do/exp/",
-		"include a set of comma separated prefixes on the output")
+	include := flag.String("include",
+		"do/doge/,do/services/,do/teams/,do/tools/,do/exp/",
+		"define changes to be filtered with a set of comma separated prefixes")
 	merge := flag.Bool("merge", false, "diff using the latest merge commit")
 	flagJSON := flag.Bool("json", false, "output list of changes as json")
 	flag.Parse()

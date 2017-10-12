@@ -199,6 +199,72 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	}
 }
 
+func TestGTA_Prefix(t *testing.T) {
+	// A depends on B and foo
+	// B depends on C and bar
+	// C depends on qux
+	difr := &testDiffer{
+		diff: map[string]bool{
+			"dirB":   false,
+			"dirC":   false,
+			"dirFoo": false,
+		},
+	}
+
+	graph := &Graph{
+		graph: map[string]map[string]bool{
+			"C": map[string]bool{
+				"B": true,
+			},
+			"B": map[string]bool{
+				"A": true,
+			},
+			"foo": map[string]bool{
+				"A": true,
+			},
+			"bar": map[string]bool{
+				"B": true,
+			},
+			"qux": map[string]bool{
+				"C": true,
+			},
+		},
+	}
+
+	pkgr := &testPackager{
+		dirs2Imports: map[string]string{
+			"dirA":   "A",
+			"dirB":   "B",
+			"dirC":   "C",
+			"dirFoo": "foo",
+			"dirBar": "bar",
+			"dirQux": "qux",
+		},
+		graph: graph,
+		errs:  make(map[string]error),
+	}
+	want := []*build.Package{
+		&build.Package{ImportPath: "C"},
+		&build.Package{ImportPath: "foo"},
+	}
+
+	gta, err := New(SetDiffer(difr), SetPackager(pkgr), SetPrefixes("foo", "C"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := gta.DirtyPackages()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %+v", want)
+		t.Errorf(" got: %+v", got)
+		t.Fatal("expected want and got to be equal")
+	}
+}
+
 func TestNoBuildableGoFiles(t *testing.T) {
 	// we have changes but they don't belong to any dirty golang files, so no dirty packages
 	const dir = "docs"
