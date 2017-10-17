@@ -45,12 +45,12 @@ func main() {
 		log.Fatalf("can't prepare gta: %v", err)
 	}
 
-	if *flagJSON {
-		packages, err := gt.ChangedPackages()
-		if err != nil {
-			log.Fatalf("can't list dirty packages: %v", err)
-		}
+	packages, err := gt.ChangedPackages()
+	if err != nil {
+		log.Fatalf("can't list dirty packages: %v", err)
+	}
 
+	if *flagJSON {
 		err = json.NewEncoder(os.Stdout).Encode(packages)
 		if err != nil {
 			log.Fatal(err)
@@ -58,12 +58,7 @@ func main() {
 		return
 	}
 
-	pkgs, err := gt.DirtyPackages()
-	if err != nil {
-		log.Fatalf("can't list dirty packages: %v", err)
-	}
-
-	strung := stringify(pkgs)
+	strung := stringify(packages.AllChanges)
 
 	if terminal.IsTerminal(syscall.Stdin) {
 		for _, pkg := range strung {

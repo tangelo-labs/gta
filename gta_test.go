@@ -97,10 +97,12 @@ func TestGTA(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := gta.DirtyPackages()
+	pkgs, err := gta.ChangedPackages()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	got := pkgs.AllChanges
 
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("want: %v", want)
@@ -253,10 +255,12 @@ func TestGTA_Prefix(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := gta.DirtyPackages()
+	pkgs, err := gta.ChangedPackages()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	got := pkgs.AllChanges
 
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("want: %+v", want)
@@ -289,14 +293,16 @@ func TestNoBuildableGoFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := gta.DirtyPackages()
+	pkgs, err := gta.ChangedPackages()
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	got := pkgs.AllChanges
+
 	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %v", want)
-		t.Errorf(" got: %v", got)
+		t.Errorf("want: %#v", want)
+		t.Errorf(" got: %#v", got)
 		t.Fatal("expected want and got to be equal")
 	}
 }
@@ -353,10 +359,12 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := gta.DirtyPackages()
+	pkgs, err := gta.ChangedPackages()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	got := pkgs.AllChanges
 
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("want: %v", want)

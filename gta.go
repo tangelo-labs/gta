@@ -72,56 +72,6 @@ func New(opts ...Option) (*GTA, error) {
 	return gta, nil
 }
 
-// DirtyPackages uses the differ and packager to build a list of dirty packages
-// where dirty is defined as "changed".
-func (g *GTA) DirtyPackages() ([]*build.Package, error) {
-	paths, err := g.markedPackages()
-	if err != nil {
-		return nil, err
-	}
-
-	// build our packages
-	var packages []*build.Package
-	isAdded := map[string]bool{}
-
-	for _, marked := range paths {
-		for path := range marked {
-			pkg, err := g.packager.PackageFromImport(path)
-			if err != nil {
-				if _, ok := err.(*build.NoGoError); ok {
-					// there are no buildable go files in this directory
-					// so no dirty packges
-					continue
-				}
-				return nil, fmt.Errorf("building packages for %q: %v", path, err)
-			}
-
-			if isAdded[pkg.ImportPath] {
-				continue
-			}
-
-			addPackage := func() {
-				isAdded[pkg.ImportPath] = true
-				packages = append(packages, pkg)
-
-			}
-
-			if len(g.prefixes) != 0 {
-				for _, include := range g.prefixes {
-					if strings.HasPrefix(pkg.ImportPath, include) {
-						addPackage()
-					}
-				}
-			} else {
-				addPackage()
-			}
-		}
-	}
-
-	sort.Sort(byPackageImportPath(packages))
-	return packages, nil
-}
-
 // ChangedPackages uses the differ and packager to build a map of changed root
 // packages to their dependent packages where dependent is defined as "changed"
 // as well due their dependency to the changed packages. It returns the
@@ -143,9 +93,6 @@ func (g *GTA) DirtyPackages() ([]*build.Package, error) {
 //   Dependencies = {"foo": ["bar", "qux"], "foo2" : ["afa", "bar", "qux"]}
 //   Changes      = ["foo", "foo2"]
 //   AllChanges   = ["foo", "foo2", "afa", "bar", "qux]
-//
-// If you want to get a set of unique dirty packages use DirtyPackages() (same
-// as .AllChanges)
 func (g *GTA) ChangedPackages() (*Packages, error) {
 	paths, err := g.markedPackages()
 	if err != nil {
@@ -154,8 +101,6 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 
 	cp := &Packages{
 		Dependencies: map[string][]*build.Package{},
-		Changes:      []*build.Package{},
-		AllChanges:   []*build.Package{},
 	}
 
 	// build our packages
