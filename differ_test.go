@@ -62,7 +62,7 @@ bar/baz/qux/corge.go
 	for _, tt := range tests {
 		t.Log(tt.desc)
 
-		got, err := diffFileDirectories(tt.root, bytes.NewReader(tt.buf))
+		got, _, err := diffFileDirectories(tt.root, bytes.NewReader(tt.buf))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
