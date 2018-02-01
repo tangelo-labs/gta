@@ -68,9 +68,8 @@ func (g *Git) diffDirs() (map[string]bool, map[string]bool, error) {
 		return nil, nil, err
 	}
 	root := strings.TrimSpace(string(out))
-
 	parent1 := "origin/master"
-	parent2 := "HEAD"
+	rightwardParents := []string{"HEAD"}
 	if g.UseMergeCommit {
 		out, err := exec.Command("git", "log", "-1", "--merges", "--pretty=format:%p").Output()
 		if err != nil {
@@ -78,29 +77,46 @@ func (g *Git) diffDirs() (map[string]bool, map[string]bool, error) {
 		}
 		parents := strings.TrimSpace(string(out))
 		parentSplit := strings.Split(parents, " ")
-		if len(parentSplit) != 2 {
+		if len(parentSplit) < 2 {
 			return nil, nil, fmt.Errorf("could not discover parent merge commits")
 		}
 		parent1 = parentSplit[0]
-		parent2 = parentSplit[1]
+		rightwardParents = parentSplit[1:]
 	}
 
-	cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only")
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, nil, err
+	dirs, files := make(map[string]bool), make(map[string]bool)
+
+	for _, parent2 := range rightwardParents {
+		cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only")
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if err := cmd.Start(); err != nil {
+			return nil, nil, err
+		}
+
+		changedDirs, changedFiles, err := diffFileDirectories(root, stdout)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for k, v := range changedDirs {
+			dirs[k] = v
+		}
+
+		for k, v := range changedFiles {
+			files[k] = v
+		}
+
+		err = cmd.Wait()
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
-	if err := cmd.Start(); err != nil {
-		return nil, nil, err
-	}
-
-	dirs, files, err := diffFileDirectories(root, stdout)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return dirs, files, cmd.Wait()
+	return dirs, files, nil
 }
 
 // diffFileDirectories returns the directories and files that have changed
