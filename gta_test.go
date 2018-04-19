@@ -62,7 +62,7 @@ func TestGTA(t *testing.T) {
 	// dirC is dirty, we expect them all to be marked
 	difr := &testDiffer{
 		diff: map[string]bool{
-			"dirC": false,
+			"dirC": true,
 		},
 	}
 
@@ -118,8 +118,8 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 	difr := &testDiffer{
 		diff: map[string]bool{
-			"dirC": false,
-			"dirH": false,
+			"dirC": true,
+			"dirH": true,
 		},
 	}
 
@@ -207,9 +207,9 @@ func TestGTA_Prefix(t *testing.T) {
 	// C depends on qux
 	difr := &testDiffer{
 		diff: map[string]bool{
-			"dirB":   false,
-			"dirC":   false,
-			"dirFoo": false,
+			"dirB":   true,
+			"dirC":   true,
+			"dirFoo": true,
 		},
 	}
 
@@ -315,9 +315,9 @@ func TestSpecialCaseDirectory(t *testing.T) {
 	)
 	difr := &testDiffer{
 		diff: map[string]bool{
-			special1: false, // this
-			special2: false,
-			"dirC":   false,
+			special1: true, // this
+			special2: true,
+			"dirC":   true,
 		},
 	}
 	graph := &Graph{

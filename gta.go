@@ -169,7 +169,13 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 
 	// we build our set of initial dirty packages from the git diff
 	changed := make(map[string]bool)
-	for dir := range dirs {
+	for dir, exists := range dirs {
+		// skip directories that have been deleted.
+		// TODO(bc): figure out how to test for dependencies of a package that was fully deleted.
+		if !exists {
+			continue
+		}
+
 		// Avoid .foo, _foo, and testdata directory trees how the go tool does!
 		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
 		// Above link is not guranteed to work.

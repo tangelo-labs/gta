@@ -26,7 +26,9 @@ type Git struct {
 	UseMergeCommit bool
 }
 
-// Diff returns a set of changed directories.
+// Diff returns a set of changed directories. The keys of the returned map are
+// absolute paths. The map values indicate whether or not the directory exists:
+// a false value means the directory was deleted.
 func (g *Git) Diff() (map[string]bool, error) {
 	dirs, _, err := g.diffDirs()
 	if err != nil {
@@ -35,15 +37,15 @@ func (g *Git) Diff() (map[string]bool, error) {
 
 	existsDirs := map[string]bool{}
 	for dir := range dirs {
-		if exists(dir) {
-			existsDirs[dir] = false
-		}
+		existsDirs[dir] = exists(dir)
 	}
 
 	return existsDirs, nil
 }
 
-// DiffFiles returns a set of changed files.
+// DiffFiles returns a set of changed files. The keys of the returned map are
+// absolute paths. The map values indicate whether or not the file exists: a
+// false value means the file was deleted.
 func (g *Git) DiffFiles() (map[string]bool, error) {
 	_, files, err := g.diffDirs()
 	if err != nil {
@@ -52,9 +54,7 @@ func (g *Git) DiffFiles() (map[string]bool, error) {
 
 	existsFiles := map[string]bool{}
 	for file := range files {
-		if exists(file) {
-			existsFiles[file] = false
-		}
+		existsFiles[file] = exists(file)
 	}
 
 	return existsFiles, nil
