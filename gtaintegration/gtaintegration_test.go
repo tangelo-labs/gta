@@ -1,0 +1,278 @@
+// +build integration
+
+package gtaintegration
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"go/build"
+	"io"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"testing"
+
+	"do/tools/build/gta"
+
+	"github.com/go-test/deep"
+	"github.com/pkg/errors"
+)
+
+const (
+	repoRoot = "testdata/gtaintegration"
+)
+
+func TestMain(m *testing.M) {
+	if err := testMain(m); err != nil {
+		log.Println(err)
+		os.Exit(1)
+	}
+}
+
+func TestPackageRemoval(t *testing.T) {
+	ctx := context.Background()
+	if _, err := runGit(ctx, ".", "checkout", "-b", t.Name(), "master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// delete all go files from gofilesdeleted
+	deleteGoFilesDir, err := os.Open(filepath.Clean("src/gtaintegration/gofilesdeleted"))
+
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer deleteGoFilesDir.Close()
+
+	names, err := deleteGoFilesDir.Readdirnames(-1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, fn := range names {
+		if filepath.Ext(fn) == ".go" {
+			err := os.Remove(filepath.Join(filepath.Clean("src/gtaintegration/gofilesdeleted"), fn))
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// fully delete deleted
+	if err := os.RemoveAll(filepath.Clean("src/gtaintegration/deleted")); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "status", "--short")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+
+	if _, err := runGit(ctx, ".", "commit", "-a", "-m", "delete some stuff"); err != nil {
+		t.Fatal(err)
+	}
+
+	options := []gta.Option{
+		gta.SetDiffer(gta.NewDiffer(false)),
+		gta.SetPrefixes("gtaintegration"),
+	}
+
+	gt, err := gta.New(options...)
+	if err != nil {
+		t.Fatalf("can't prepare gta: %v", err)
+	}
+
+	want := new(gta.Packages)
+	want.Dependencies = make(map[string][]*build.Package)
+
+	got, err := gt.ChangedPackages()
+	if err != nil {
+		t.Fatalf("err = %q; want nil", err)
+	}
+
+	if diff := deep.Equal(got.Dependencies, want.Dependencies); diff != nil {
+		t.Errorf("Dependencies: %v", diff)
+	}
+	if diff := deep.Equal(got.Changes, want.Changes); diff != nil {
+		t.Errorf("Changes: %v", diff)
+	}
+	if diff := deep.Equal(got.AllChanges, want.AllChanges); diff != nil {
+		t.Errorf("AllChanges: %v", diff)
+	}
+}
+
+func testMain(m *testing.M) error {
+	flag.Parse()
+
+	// copy all of testdata to a temporary directory, because we're going to
+	// mutate it.
+	wd := prepareTemp()
+
+	// change to the temporary directory
+	err := os.Chdir(wd)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(wd)
+
+	// configure the repository.
+	err = createRepo(repoRoot)
+	if err != nil {
+		return err
+	}
+
+	// change to the repository for the remainder of the tests
+	err = os.Chdir(repoRoot)
+	if err != nil {
+		return err
+	}
+
+	wd, err = os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	// This is super jank, but the default packager uses build.Default, so just set GOPATH in it...
+	build.Default.GOPATH = wd
+
+	if i := m.Run(); i != 0 {
+		return errors.New("failed")
+	}
+
+	return nil
+}
+
+func createRepo(path string) error {
+	if testing.Verbose() {
+		log.Println("creating repo in " + path)
+	}
+
+	ctx := context.Background()
+	// git init
+	if _, err := runGit(ctx, path, "init"); err != nil {
+		return err
+	}
+
+	if _, err := runGit(ctx, path, "add", "src"); err != nil {
+		return err
+	}
+
+	if _, err := runGit(ctx, path, "commit", "-m", "initial commit"); err != nil {
+		return err
+	}
+
+	// create an origin/master branch from master to simulate a remote.
+	if _, err := runGit(ctx, path, "branch", "origin/master"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func runGit(ctx context.Context, wd string, args ...string) (string, error) {
+	args = append([]string{"-c", "user.email=gtaintegration@example.com", "-c", "user.name=gtaintegration test"}, args...)
+
+	cmd := exec.CommandContext(ctx, "git", args...)
+	wd = abs(wd)
+
+	cmd.Dir = wd
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.New(string(out))
+	}
+	return string(out), nil
+}
+
+func abs(path string) string {
+	path, err := filepath.Abs(path)
+	if err != nil {
+		panic(err)
+	}
+
+	return path
+}
+
+func prepareTemp() string {
+	d, err := ioutil.TempDir("", "gta-integration-tests")
+	if err != nil {
+		panic(err)
+	}
+
+	err = filepath.Walk("testdata", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if info.IsDir() {
+			dir := filepath.Join(d, path)
+			err := os.Mkdir(dir, info.Mode())
+			if err != nil {
+				return errors.Wrap(err, fmt.Sprintf("could not create directory (%s)", dir))
+			}
+			return nil
+		}
+
+		src, err := os.Open(path)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("could not open file (%s)", path))
+		}
+		defer src.Close()
+
+		dst, err := os.Create(filepath.Join(d, path))
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("could not open file (%s)", path))
+		}
+		defer dst.Close()
+
+		_, err = io.Copy(dst, src)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("could not copy file (%s)", path))
+		}
+
+		err = os.Chmod(dst.Name(), info.Mode())
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("could not set file permission (%s)", dst.Name()))
+		}
+		return nil
+	})
+
+	if err != nil {
+		os.RemoveAll(d)
+		panic(err)
+	}
+
+	return d
+}
+
+// setenv sets an environment variable, name, to value and returns a function
+// to restore the environment variable to its former value.
+func setEnv(t *testing.T, name, value string) func() {
+	t.Helper()
+
+	orig, ok := os.LookupEnv(name)
+
+	if err := os.Setenv(name, value); err != nil {
+		t.Fatal(err)
+	}
+
+	return func() {
+		if !ok {
+			if err := os.Unsetenv(name); err != nil {
+				t.Fatal(err)
+			}
+
+			return
+		}
+
+		if err := os.Setenv(name, orig); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
