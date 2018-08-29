@@ -34,9 +34,7 @@ func main() {
 	flag.Parse()
 
 	options := []gta.Option{
-		gta.SetDiffer(&gta.Git{
-			UseMergeCommit: *merge,
-		}),
+		gta.SetDiffer(gta.NewDiffer(*merge)),
 		gta.SetPrefixes(strings.Split(*include, ",")...),
 	}
 

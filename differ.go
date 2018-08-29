@@ -16,20 +16,27 @@ type Differ interface {
 	// Diff returns a set of absolute pathed directories
 	// that have files that have been modified.
 	Diff() (map[string]bool, error)
+
+	// DiffFiles returns a set of absolute pathed files that have been modified.
+	DiffFiles() (map[string]bool, error)
 }
 
-// We check to make sure Git implements the Differ interface.
-var _ Differ = &Git{}
+// NewDiffer returns a Differ that determines differences using git.
+func NewDiffer(useMergeCommit bool) Differ {
+	return &git{
+		useMergeCommit: useMergeCommit,
+	}
+}
 
 // Git implements the Differ interface using a git version control method.
-type Git struct {
-	UseMergeCommit bool
+type git struct {
+	useMergeCommit bool
 }
 
 // Diff returns a set of changed directories. The keys of the returned map are
 // absolute paths. The map values indicate whether or not the directory exists:
 // a false value means the directory was deleted.
-func (g *Git) Diff() (map[string]bool, error) {
+func (g *git) Diff() (map[string]bool, error) {
 	dirs, _, err := g.diffDirs()
 	if err != nil {
 		return nil, err
@@ -46,7 +53,7 @@ func (g *Git) Diff() (map[string]bool, error) {
 // DiffFiles returns a set of changed files. The keys of the returned map are
 // absolute paths. The map values indicate whether or not the file exists: a
 // false value means the file was deleted.
-func (g *Git) DiffFiles() (map[string]bool, error) {
+func (g *git) DiffFiles() (map[string]bool, error) {
 	_, files, err := g.diffDirs()
 	if err != nil {
 		return nil, err
@@ -61,7 +68,7 @@ func (g *Git) DiffFiles() (map[string]bool, error) {
 }
 
 // diffDirs returns a set of changed directories and files
-func (g *Git) diffDirs() (map[string]bool, map[string]bool, error) {
+func (g *git) diffDirs() (map[string]bool, map[string]bool, error) {
 	// We get the root of the repository to build our full path.
 	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 	if err != nil {
@@ -70,7 +77,7 @@ func (g *Git) diffDirs() (map[string]bool, map[string]bool, error) {
 	root := strings.TrimSpace(string(out))
 	parent1 := "origin/master"
 	rightwardParents := []string{"HEAD"}
-	if g.UseMergeCommit {
+	if g.useMergeCommit {
 		out, err := exec.Command("git", "log", "-1", "--merges", "--pretty=format:%p").Output()
 		if err != nil {
 			return nil, nil, err

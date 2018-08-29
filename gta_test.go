@@ -17,6 +17,10 @@ func (t *testDiffer) Diff() (map[string]bool, error) {
 	return t.diff, nil
 }
 
+func (t *testDiffer) DiffFiles() (map[string]bool, error) {
+	panic("not implemented")
+}
+
 var _ Packager = &testPackager{}
 
 type testPackager struct {
