@@ -10,10 +10,10 @@ import (
 var _ Differ = &testDiffer{}
 
 type testDiffer struct {
-	diff map[string]bool
+	diff map[string]Directory
 }
 
-func (t *testDiffer) Diff() (map[string]bool, error) {
+func (t *testDiffer) Diff() (map[string]Directory, error) {
 	return t.diff, nil
 }
 
@@ -65,8 +65,8 @@ func TestGTA(t *testing.T) {
 	// A depends on B depends on C
 	// dirC is dirty, we expect them all to be marked
 	difr := &testDiffer{
-		diff: map[string]bool{
-			"dirC": true,
+		diff: map[string]Directory{
+			"dirC": Directory{Exists: true},
 		},
 	}
 
@@ -121,9 +121,9 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	// E depends on F depends on G
 
 	difr := &testDiffer{
-		diff: map[string]bool{
-			"dirC": true,
-			"dirH": true,
+		diff: map[string]Directory{
+			"dirC": Directory{Exists: true},
+			"dirH": Directory{Exists: true},
 		},
 	}
 
@@ -210,10 +210,10 @@ func TestGTA_Prefix(t *testing.T) {
 	// B depends on C and bar
 	// C depends on qux
 	difr := &testDiffer{
-		diff: map[string]bool{
-			"dirB":   true,
-			"dirC":   true,
-			"dirFoo": true,
+		diff: map[string]Directory{
+			"dirB":   Directory{Exists: true},
+			"dirC":   Directory{Exists: true},
+			"dirFoo": Directory{Exists: true},
 		},
 	}
 
@@ -277,8 +277,8 @@ func TestNoBuildableGoFiles(t *testing.T) {
 	// we have changes but they don't belong to any dirty golang files, so no dirty packages
 	const dir = "docs"
 	difr := &testDiffer{
-		diff: map[string]bool{
-			dir: false,
+		diff: map[string]Directory{
+			dir: Directory{},
 		},
 	}
 
@@ -318,10 +318,10 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		special2 = "specia/case/testdata/multi"
 	)
 	difr := &testDiffer{
-		diff: map[string]bool{
-			special1: true, // this
-			special2: true,
-			"dirC":   true,
+		diff: map[string]Directory{
+			special1: Directory{Exists: true}, // this
+			special2: Directory{Exists: true},
+			"dirC":   Directory{Exists: true},
 		},
 	}
 	graph := &Graph{

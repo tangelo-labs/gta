@@ -169,23 +169,23 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 
 	// we build our set of initial dirty packages from the git diff
 	changed := make(map[string]bool)
-	for dir, exists := range dirs {
+	for abs, dir := range dirs {
 		// skip directories that have been deleted.
 		// TODO(bc): figure out how to test for dependencies of a package that was fully deleted.
-		if !exists {
+		if !dir.Exists {
 			continue
 		}
 
 		// Avoid .foo, _foo, and testdata directory trees how the go tool does!
 		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
 		// Above link is not guranteed to work.
-		base := filepath.Base(dir)
-		parent := filepath.Base(filepath.Dir(dir))
+		base := filepath.Base(abs)
+		parent := filepath.Base(filepath.Dir(abs))
 		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" || parent == "testdata" {
 			continue
 		}
 
-		pkg, err := g.packager.PackageFromDir(dir)
+		pkg, err := g.packager.PackageFromDir(abs)
 		if err != nil {
 			if _, ok := err.(*build.NoGoError); ok {
 				// there are no buildable go files in this directory
@@ -197,7 +197,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 				continue
 			}
 
-			return nil, fmt.Errorf("pulling package information for %q, %v", dir, err)
+			return nil, fmt.Errorf("pulling package information for %q, %v", abs, err)
 		}
 
 		// we create a simple set of changed pkgs by import path
