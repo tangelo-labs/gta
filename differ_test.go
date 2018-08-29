@@ -6,6 +6,9 @@ import (
 	"testing"
 )
 
+// check to make sure Git implements the Differ interface.
+var _ Differ = &git{}
+
 func Test_diffFileDirectories(t *testing.T) {
 	var tests = []struct {
 		desc string
