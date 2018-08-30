@@ -164,13 +164,11 @@ func TestGTA_ChangedPackages(t *testing.T) {
 			"C": []*build.Package{
 				{ImportPath: "A"},
 				{ImportPath: "B"},
-				{ImportPath: "C"},
 				{ImportPath: "D"},
 			},
 			"G": []*build.Package{
 				{ImportPath: "E"},
 				{ImportPath: "F"},
-				{ImportPath: "G"},
 			},
 		},
 		Changes: []*build.Package{
