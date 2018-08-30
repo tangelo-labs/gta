@@ -4,6 +4,7 @@ package gtaintegration
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"go/build"
@@ -88,22 +89,50 @@ func TestPackageRemoval(t *testing.T) {
 		t.Fatalf("can't prepare gta: %v", err)
 	}
 
-	want := new(gta.Packages)
-	want.Dependencies = make(map[string][]*build.Package)
+	want := &gta.Packages{
+		Dependencies: map[string][]*build.Package{
+			"gtaintegration/deleted": []*build.Package{
+				&build.Package{
+					ImportPath: "gtaintegration/deletedclient",
+				},
+			},
+			"gtaintegration/gofilesdeleted": []*build.Package{
+				&build.Package{
+					ImportPath: "gtaintegration/gofilesdeletedclient",
+				},
+			},
+		},
+		Changes: []*build.Package{
+			&build.Package{
+				ImportPath: "gtaintegration/deleted",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/gofilesdeleted",
+			},
+		},
+		AllChanges: []*build.Package{
+			&build.Package{
+				ImportPath: "gtaintegration/deleted",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/deletedclient",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/gofilesdeleted",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/gofilesdeletedclient",
+			},
+		},
+	}
 
 	got, err := gt.ChangedPackages()
 	if err != nil {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(got.Dependencies, want.Dependencies); diff != nil {
-		t.Errorf("Dependencies: %v", diff)
-	}
-	if diff := deep.Equal(got.Changes, want.Changes); diff != nil {
-		t.Errorf("Changes: %v", diff)
-	}
-	if diff := deep.Equal(got.AllChanges, want.AllChanges); diff != nil {
-		t.Errorf("AllChanges: %v", diff)
+	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
+		t.Error(diff)
 	}
 }
 
@@ -275,4 +304,22 @@ func setEnv(t *testing.T, name, value string) func() {
 			t.Fatal(err)
 		}
 	}
+}
+
+func mapFromPackages(t *testing.T, pkg *gta.Packages) map[string]interface{} {
+	t.Helper()
+
+	m := make(map[string]interface{})
+
+	b, err := json.Marshal(pkg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = json.Unmarshal(b, &m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return m
 }
