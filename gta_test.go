@@ -5,6 +5,8 @@ import (
 	"go/build"
 	"reflect"
 	"testing"
+
+	"github.com/go-test/deep"
 )
 
 var _ Differ = &testDiffer{}
@@ -200,10 +202,8 @@ func TestGTA_ChangedPackages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %+v", want)
-		t.Errorf(" got: %+v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := deep.Equal(got, want); diff != nil {
+		t.Error(diff)
 	}
 }
 
