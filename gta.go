@@ -123,8 +123,9 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 				allChanges[pkg.ImportPath] = pkg
 				if changed == pkg.ImportPath {
 					cp.Changes = append(cp.Changes, pkg)
+				} else {
+					packages = append(packages, pkg)
 				}
-				packages = append(packages, pkg)
 			}
 
 			if len(g.prefixes) != 0 {
