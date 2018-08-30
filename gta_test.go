@@ -46,6 +46,10 @@ func (t *testPackager) PackageFromDir(a string) (*build.Package, error) {
 	}, nil
 }
 
+func (t *testPackager) PackageFromEmptyDir(a string) (*build.Package, error) {
+	return nil, errors.New("not implemented")
+}
+
 func (t *testPackager) PackageFromImport(a string) (*build.Package, error) {
 	for _, v := range t.dirs2Imports {
 		if a == v {
