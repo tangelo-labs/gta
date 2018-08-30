@@ -113,7 +113,8 @@ func (g *git) diff() (map[string]struct{}, error) {
 			files := make(map[string]struct{})
 
 			for _, parent2 := range rightwardParents {
-				cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only")
+				// get the names of all affected files without doing rename detection.
+				cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only", "--no-renames")
 				stdout, err := cmd.StdoutPipe()
 				if err != nil {
 					return nil, err

@@ -66,6 +66,11 @@ func TestPackageRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// move some files to a different directory
+	if _, err := runGit(ctx, ".", "mv", "src/gtaintegration/movedfrom", "src/gtaintegration/movedto"); err != nil {
+		t.Fatal(err)
+	}
+
 	if testing.Verbose() {
 		out, err := runGit(ctx, ".", "status", "--short")
 		if err != nil {
@@ -79,6 +84,14 @@ func TestPackageRemoval(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "diff", "origin/master...HEAD", "--name-only", "--no-renames")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
 	options := []gta.Option{
 		gta.SetDiffer(gta.NewDiffer(false)),
 		gta.SetPrefixes("gtaintegration"),
@@ -101,6 +114,11 @@ func TestPackageRemoval(t *testing.T) {
 					ImportPath: "gtaintegration/gofilesdeletedclient",
 				},
 			},
+			"gtaintegration/movedfrom": []*build.Package{
+				&build.Package{
+					ImportPath: "gtaintegration/movedfromclient",
+				},
+			},
 		},
 		Changes: []*build.Package{
 			&build.Package{
@@ -108,6 +126,12 @@ func TestPackageRemoval(t *testing.T) {
 			},
 			&build.Package{
 				ImportPath: "gtaintegration/gofilesdeleted",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedfrom",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedto",
 			},
 		},
 		AllChanges: []*build.Package{
@@ -122,6 +146,15 @@ func TestPackageRemoval(t *testing.T) {
 			},
 			&build.Package{
 				ImportPath: "gtaintegration/gofilesdeletedclient",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedfrom",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedfromclient",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedto",
 			},
 		},
 	}

@@ -104,26 +104,36 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 		Dependencies: map[string][]*build.Package{},
 	}
 
+	packageFromImport := func(path string) (*build.Package, error) {
+		pkg, err := g.packager.PackageFromImport(path)
+		if err != nil {
+			if _, ok := err.(*build.NoGoError); !ok {
+				return nil, fmt.Errorf("building packages for %q: %v", path, err)
+			}
+		}
+
+		return pkg, nil
+	}
+
 	// build our packages
 	allChanges := map[string]*build.Package{}
 	for changed, marked := range paths {
 		var packages []*build.Package
 
+		// add any dependents of the changed package; the changed package will be included in marked.
 		for path, check := range marked {
 			pkg := new(build.Package)
 			pkg.ImportPath = path
 
 			if check {
-				pkg2, err := g.packager.PackageFromImport(path)
+				pkg2, err := packageFromImport(path)
 				if err != nil {
-					if _, ok := err.(*build.NoGoError); !ok {
-						return nil, fmt.Errorf("building packages for %q: %v", path, err)
-					}
+					return nil, err
 				}
 				pkg = pkg2
 			}
 
-			addPackage := func() {
+			addPackage := func(pkg *build.Package) {
 				allChanges[pkg.ImportPath] = pkg
 				if changed == pkg.ImportPath {
 					cp.Changes = append(cp.Changes, pkg)
@@ -132,14 +142,8 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 				}
 			}
 
-			if len(g.prefixes) != 0 {
-				for _, include := range g.prefixes {
-					if strings.HasPrefix(pkg.ImportPath, include) {
-						addPackage()
-					}
-				}
-			} else {
-				addPackage()
+			if hasPrefixIn(pkg.ImportPath, g.prefixes) {
+				addPackage(pkg)
 			}
 		}
 
@@ -310,6 +314,19 @@ func mapify(pkgs map[string][]*build.Package) map[string][]string {
 func hasGoFile(files []string) bool {
 	for _, fn := range files {
 		if filepath.Ext(fn) == ".go" {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPrefixIn(s string, prefixes []string) bool {
+	if len(prefixes) == 0 {
+		return true
+	}
+
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(s, prefix) {
 			return true
 		}
 	}
