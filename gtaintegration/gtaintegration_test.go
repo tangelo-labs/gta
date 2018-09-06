@@ -417,6 +417,63 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 	}
 }
 
+func TestNonPackageRemoval(t *testing.T) {
+	ctx := context.Background()
+	if _, err := runGit(ctx, ".", "checkout", "-b", t.Name(), "master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// fully delete nogodeleted
+	if err := os.RemoveAll(filepath.Clean("src/gtaintegration/nogodeleted")); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "status", "--short")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+
+	if _, err := runGit(ctx, ".", "commit", "-a", "-m", "delete some stuff"); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "diff", "origin/master...HEAD", "--name-only", "--no-renames")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+	options := []gta.Option{
+		gta.SetDiffer(gta.NewDiffer(false)),
+		gta.SetPrefixes("gtaintegration"),
+	}
+
+	gt, err := gta.New(options...)
+	if err != nil {
+		t.Fatalf("can't prepare gta: %v", err)
+	}
+
+	want := &gta.Packages{
+		Dependencies: map[string][]*build.Package{},
+		Changes:      []*build.Package{},
+		AllChanges:   []*build.Package{},
+	}
+
+	got, err := gt.ChangedPackages()
+	if err != nil {
+		t.Fatalf("err = %q; want nil", err)
+	}
+
+	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
+		t.Error(diff)
+	}
+}
 func testMain(m *testing.M) error {
 	flag.Parse()
 
