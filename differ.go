@@ -8,60 +8,36 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 // Differ implements a single method, used to note code diffs
 // and the dirs they occur.
 type Differ interface {
-	// Diff returns a set of absolute pathed directories that have files that
-	// have been modified.
-	Diff() (map[string]Directory, error)
-
-	// DiffFiles returns a set of absolute pathed files that have been modified.
-	DiffFiles() (map[string]bool, error)
+	// Diff returns a set of absolute pathed directories
+	// that have files that have been modified.
+	Diff() (map[string]bool, error)
 }
 
-// NewDiffer returns a Differ that determines differences using git.
-func NewDiffer(useMergeCommit bool) Differ {
-	return &git{
-		useMergeCommit: useMergeCommit,
-	}
-}
+// We check to make sure Git implements the Differ interface.
+var _ Differ = &Git{}
 
-// git implements the Differ interface using a git version control method.
-type git struct {
-	useMergeCommit bool
-	onceDiff       sync.Once
-	changedFiles   map[string]struct{}
-	diffErr        error
-}
-
-// A Directory describes changes to a directory and its contents.
-type Directory struct {
-	Exists bool
-	Files  []string
+// Git implements the Differ interface using a git version control method.
+type Git struct {
+	UseMergeCommit bool
 }
 
 // Diff returns a set of changed directories. The keys of the returned map are
-// absolute paths.
-func (g *git) Diff() (map[string]Directory, error) {
-	files, err := g.diff()
+// absolute paths. The map values indicate whether or not the directory exists:
+// a false value means the directory was deleted.
+func (g *Git) Diff() (map[string]bool, error) {
+	dirs, _, err := g.diffDirs()
 	if err != nil {
 		return nil, err
 	}
 
-	existsDirs := make(map[string]Directory, len(files))
-	for abs := range files {
-		absdir := filepath.Dir(abs)
-		dir, ok := existsDirs[absdir]
-		if !ok {
-			dir.Exists = exists(absdir)
-		}
-
-		fn := filepath.Base(abs)
-		dir.Files = append(dir.Files, fn)
-		existsDirs[absdir] = dir
+	existsDirs := map[string]bool{}
+	for dir := range dirs {
+		existsDirs[dir] = exists(dir)
 	}
 
 	return existsDirs, nil
@@ -70,105 +46,99 @@ func (g *git) Diff() (map[string]Directory, error) {
 // DiffFiles returns a set of changed files. The keys of the returned map are
 // absolute paths. The map values indicate whether or not the file exists: a
 // false value means the file was deleted.
-func (g *git) DiffFiles() (map[string]bool, error) {
-	files, err := g.diff()
+func (g *Git) DiffFiles() (map[string]bool, error) {
+	_, files, err := g.diffDirs()
 	if err != nil {
 		return nil, err
 	}
 
 	existsFiles := map[string]bool{}
-	for abs := range files {
-		existsFiles[abs] = exists(abs)
+	for file := range files {
+		existsFiles[file] = exists(file)
 	}
 
 	return existsFiles, nil
 }
 
-// diff returns a set of changed files.
-func (g *git) diff() (map[string]struct{}, error) {
-	g.onceDiff.Do(func() {
-		files, err := func() (map[string]struct{}, error) {
-			// We get the root of the repository to build our full path.
-			out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
-			if err != nil {
-				return nil, err
-			}
-			root := strings.TrimSpace(string(out))
-			parent1 := "origin/master"
-			rightwardParents := []string{"HEAD"}
-			if g.useMergeCommit {
-				out, err := exec.Command("git", "log", "-1", "--merges", "--pretty=format:%p").Output()
-				if err != nil {
-					return nil, err
-				}
-				parents := strings.TrimSpace(string(out))
-				parentSplit := strings.Split(parents, " ")
-				if len(parentSplit) < 2 {
-					return nil, fmt.Errorf("could not discover parent merge commits")
-				}
-				parent1 = parentSplit[0]
-				rightwardParents = parentSplit[1:]
-			}
-
-			files := make(map[string]struct{})
-
-			for _, parent2 := range rightwardParents {
-				// get the names of all affected files without doing rename detection.
-				cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only", "--no-renames")
-				stdout, err := cmd.StdoutPipe()
-				if err != nil {
-					return nil, err
-				}
-
-				if err := cmd.Start(); err != nil {
-					return nil, err
-				}
-
-				changedPaths, err := diffPaths(root, stdout)
-				if err != nil {
-					return nil, err
-				}
-
-				for path := range changedPaths {
-					files[path] = struct{}{}
-				}
-
-				err = cmd.Wait()
-				if err != nil {
-					return nil, err
-				}
-			}
-			return files, nil
-		}()
+// diffDirs returns a set of changed directories and files
+func (g *Git) diffDirs() (map[string]bool, map[string]bool, error) {
+	// We get the root of the repository to build our full path.
+	out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+	if err != nil {
+		return nil, nil, err
+	}
+	root := strings.TrimSpace(string(out))
+	parent1 := "origin/master"
+	rightwardParents := []string{"HEAD"}
+	if g.UseMergeCommit {
+		out, err := exec.Command("git", "log", "-1", "--merges", "--pretty=format:%p").Output()
 		if err != nil {
-			g.diffErr = nil
-			return
+			return nil, nil, err
+		}
+		parents := strings.TrimSpace(string(out))
+		parentSplit := strings.Split(parents, " ")
+		if len(parentSplit) < 2 {
+			return nil, nil, fmt.Errorf("could not discover parent merge commits")
+		}
+		parent1 = parentSplit[0]
+		rightwardParents = parentSplit[1:]
+	}
+
+	dirs, files := make(map[string]bool), make(map[string]bool)
+
+	for _, parent2 := range rightwardParents {
+		cmd := exec.Command("git", "diff", fmt.Sprintf("%s...%s", parent1, parent2), "--name-only")
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return nil, nil, err
 		}
 
-		g.changedFiles = files
-	})
+		if err := cmd.Start(); err != nil {
+			return nil, nil, err
+		}
 
-	return g.changedFiles, g.diffErr
+		changedDirs, changedFiles, err := diffFileDirectories(root, stdout)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		for k, v := range changedDirs {
+			dirs[k] = v
+		}
+
+		for k, v := range changedFiles {
+			files[k] = v
+		}
+
+		err = cmd.Wait()
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return dirs, files, nil
 }
 
-// diffPaths returns the path that have changed.
-func diffPaths(root string, r io.Reader) (map[string]struct{}, error) {
-	paths := make(map[string]struct{})
+// diffFileDirectories returns the directories and files that have changed
+func diffFileDirectories(root string, r io.Reader) (map[string]bool, map[string]bool, error) {
+	dirs := map[string]bool{}
+	files := map[string]bool{}
 
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		path := scanner.Text()
+		filename := scanner.Text()
 
 		// We build our full absolute file path.
-		full, err := filepath.Abs(filepath.Join(root, path))
+		full, err := filepath.Abs(filepath.Join(root, filename))
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		paths[full] = struct{}{}
+		files[full] = false
+		dirs[filepath.Dir(full)] = false
 	}
 
-	return paths, scanner.Err()
+	return dirs, files, scanner.Err()
 }
 
 func exists(path string) bool {

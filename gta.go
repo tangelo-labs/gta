@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"go/build"
 	"go/scanner"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -31,7 +30,7 @@ type Packages struct {
 	Changes []*build.Package
 
 	// AllChanges represents all packages that are dirty including the initial
-	// changed packages.
+	// changed packages
 	AllChanges []*build.Package
 }
 
@@ -59,7 +58,7 @@ type GTA struct {
 // New returns a new GTA with various options passed to New.
 func New(opts ...Option) (*GTA, error) {
 	gta := &GTA{
-		differ:   &git{},
+		differ:   &Git{},
 		packager: DefaultPackager,
 	}
 
@@ -104,46 +103,38 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 		Dependencies: map[string][]*build.Package{},
 	}
 
-	packageFromImport := func(path string) (*build.Package, error) {
-		pkg, err := g.packager.PackageFromImport(path)
-		if err != nil {
-			if _, ok := err.(*build.NoGoError); !ok {
-				return nil, fmt.Errorf("building packages for %q: %v", path, err)
-			}
-		}
-
-		return pkg, nil
-	}
-
 	// build our packages
 	allChanges := map[string]*build.Package{}
 	for changed, marked := range paths {
 		var packages []*build.Package
 
-		// add any dependents of the changed package; the changed package will be included in marked.
-		for path, check := range marked {
-			pkg := new(build.Package)
-			pkg.ImportPath = path
-
-			if check {
-				pkg2, err := packageFromImport(path)
-				if err != nil {
-					return nil, err
+		for path := range marked {
+			pkg, err := g.packager.PackageFromImport(path)
+			if err != nil {
+				if _, ok := err.(*build.NoGoError); ok {
+					// there are no buildable go files in this directory
+					// so no dirty packges
+					continue
 				}
-				pkg = pkg2
+				return nil, fmt.Errorf("building packages for %q: %v", path, err)
 			}
 
-			addPackage := func(pkg *build.Package) {
+			addPackage := func() {
 				allChanges[pkg.ImportPath] = pkg
 				if changed == pkg.ImportPath {
 					cp.Changes = append(cp.Changes, pkg)
-				} else {
-					packages = append(packages, pkg)
 				}
+				packages = append(packages, pkg)
 			}
 
-			if hasPrefixIn(pkg.ImportPath, g.prefixes) {
-				addPackage(pkg)
+			if len(g.prefixes) != 0 {
+				for _, include := range g.prefixes {
+					if strings.HasPrefix(pkg.ImportPath, include) {
+						addPackage()
+					}
+				}
+			} else {
+				addPackage()
 			}
 		}
 
@@ -176,50 +167,37 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		return nil, fmt.Errorf("diffing directory for dirty packages, %v", err)
 	}
 
-	// we build our set of initial dirty packages from the git diff. The map
-	// value is true when the package was deleted.
+	// we build our set of initial dirty packages from the git diff
 	changed := make(map[string]bool)
-	for abs, dir := range dirs {
+	for dir, exists := range dirs {
+		// skip directories that have been deleted.
+		// TODO(bc): figure out how to test for dependencies of a package that was fully deleted.
+		if !exists {
+			continue
+		}
+
 		// Avoid .foo, _foo, and testdata directory trees how the go tool does!
 		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
-		// Above link is not guaranteed to work.
-		base := filepath.Base(abs)
-		parent := filepath.Base(filepath.Dir(abs))
+		// Above link is not guranteed to work.
+		base := filepath.Base(dir)
+		parent := filepath.Base(filepath.Dir(dir))
 		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" || parent == "testdata" {
 			continue
 		}
 
-		pkg, err := g.packager.PackageFromDir(abs)
+		pkg, err := g.packager.PackageFromDir(dir)
 		if err != nil {
-			switch err.(type) {
-			case *build.NoGoError:
-				if hasGoFile(dir.Files) {
-					importPath, err := g.findImportPath(abs)
-					if err != nil {
-						continue
-					}
-					pkg.ImportPath = importPath
-
-					changed[pkg.ImportPath] = true
-					continue
-				}
-				// there are and were no buildable go files in this directory
+			if _, ok := err.(*build.NoGoError); ok {
+				// there are no buildable go files in this directory
 				// so no dirty packages
 				continue
-			case scanner.ErrorList:
+			}
+			if _, ok := err.(scanner.ErrorList); ok {
 				// same, package is not buildable, so no dirty packages
 				continue
-			default:
-				if !dir.Exists && hasGoFile(dir.Files) {
-					importPath, err := g.findImportPath(abs)
-					if err != nil {
-						continue
-					}
-					changed[importPath] = true
-					continue
-				}
 			}
-			return nil, fmt.Errorf("pulling package information for %q, %v", abs, err)
+
+			return nil, fmt.Errorf("pulling package information for %q, %v", dir, err)
 		}
 
 		// we create a simple set of changed pkgs by import path
@@ -238,55 +216,10 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 
 		// we traverse the graph and build our list of mark all dependents
 		graph.Traverse(change, marked)
-
-		// clear the boolean value on the paths that no longer contain packages (i.e.
-		// the Go files were deleted...).
-		for importPath := range marked {
-			if changed[importPath] {
-				marked[importPath] = false
-			}
-		}
-
 		paths[change] = marked
 	}
 
 	return paths, nil
-}
-
-var errImportPathNotFound = errors.New("could not find import path")
-
-// findImportPath walks a directory up, trying to find an import path for
-// parent directories.
-func (g *GTA) findImportPath(abs string) (string, error) {
-	base := filepath.Base(abs)
-	parent := filepath.Dir(abs)
-
-	if base == abs {
-		return "", errImportPathNotFound
-	}
-
-	if !exists(abs) {
-		//	recurse when the directory doesn't exist
-		importPath, err := g.findImportPath(parent)
-		if err != nil && err == errImportPathNotFound {
-			return path.Join(importPath, base), err
-		}
-		return path.Join(importPath, base), nil
-	}
-
-	pkg, err := g.packager.PackageFromDir(abs)
-	if err != nil {
-		if _, ok := err.(*build.NoGoError); ok {
-			pkg, err := g.packager.PackageFromEmptyDir(abs)
-			if err == nil {
-				return pkg.ImportPath, nil
-			}
-		}
-		importPath, err := g.findImportPath(parent)
-		return path.Join(importPath, base), err
-	}
-
-	return path.Join(pkg.ImportPath, base), nil
 }
 
 type byPackageImportPath []*build.Package
@@ -309,26 +242,4 @@ func mapify(pkgs map[string][]*build.Package) map[string][]string {
 		out[key] = stringify(pkgs)
 	}
 	return out
-}
-
-func hasGoFile(files []string) bool {
-	for _, fn := range files {
-		if filepath.Ext(fn) == ".go" {
-			return true
-		}
-	}
-	return false
-}
-
-func hasPrefixIn(s string, prefixes []string) bool {
-	if len(prefixes) == 0 {
-		return true
-	}
-
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(s, prefix) {
-			return true
-		}
-	}
-	return false
 }

@@ -6,22 +6,19 @@ import (
 	"testing"
 )
 
-// check to make sure Git implements the Differ interface.
-var _ Differ = &git{}
-
 func Test_diffFileDirectories(t *testing.T) {
 	var tests = []struct {
 		desc string
 		root string
 		buf  []byte
-		want map[string]struct{}
+		want map[string]bool
 	}{
 		{
 			desc: "single changed file",
 			root: "/",
 			buf:  []byte("foo/bar.go\n"),
-			want: map[string]struct{}{
-				"/foo/bar.go": struct{}{},
+			want: map[string]bool{
+				"/foo": false,
 			},
 		},
 		{
@@ -29,9 +26,8 @@ func Test_diffFileDirectories(t *testing.T) {
 			root: "/foo",
 			buf: []byte(`bar/bar.go
 bar/baz.go`),
-			want: map[string]struct{}{
-				"/foo/bar/bar.go": struct{}{},
-				"/foo/bar/baz.go": struct{}{},
+			want: map[string]bool{
+				"/foo/bar": false,
 			},
 		},
 		{
@@ -39,9 +35,9 @@ bar/baz.go`),
 			root: "/foo/bar",
 			buf: []byte(`baz/bar.go
 baz/qux/baz.go`),
-			want: map[string]struct{}{
-				"/foo/bar/baz/bar.go":     struct{}{},
-				"/foo/bar/baz/qux/baz.go": struct{}{},
+			want: map[string]bool{
+				"/foo/bar/baz":     false,
+				"/foo/bar/baz/qux": false,
 			},
 		},
 		{
@@ -54,29 +50,26 @@ bar/baz/qux.go
 bar/baz/corge.go
 bar/baz/qux/corge.go
 `),
-			want: map[string]struct{}{
-				"/foo/bar.go":           struct{}{},
-				"/foo/baz.go":           struct{}{},
-				"/bar/foo.go":           struct{}{},
-				"/bar/baz/qux.go":       struct{}{},
-				"/bar/baz/corge.go":     struct{}{},
-				"/bar/baz/qux/corge.go": struct{}{},
+			want: map[string]bool{
+				"/foo":         false,
+				"/bar":         false,
+				"/bar/baz":     false,
+				"/bar/baz/qux": false,
 			},
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
+		t.Log(tt.desc)
 
-			got, err := diffPaths(tt.root, bytes.NewReader(tt.buf))
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
+		got, _, err := diffFileDirectories(tt.root, bytes.NewReader(tt.buf))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
 
-			if want, got := tt.want, got; !reflect.DeepEqual(want, got) {
-				t.Fatalf("unexpected file directory map:\n- want: %v\n-  got: %v",
-					want, got)
-			}
-		})
+		if want, got := tt.want, got; !reflect.DeepEqual(want, got) {
+			t.Fatalf("unexpected file directory map:\n- want: %v\n-  got: %v",
+				want, got)
+		}
 	}
 }

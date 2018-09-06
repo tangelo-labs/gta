@@ -5,7 +5,7 @@ type Graph struct {
 	graph map[string]map[string]bool
 }
 
-// Traverse is a a simple recursive depth first traversal of a directed cyclic graph.
+// Traverse is a a simple recurisve depth first traversal of a directed cyclic graph.
 func (g *Graph) Traverse(node string, mark map[string]bool) {
 	// we've already visited this node
 	if visited, ok := mark[node]; visited && ok {

@@ -5,22 +5,16 @@ import (
 	"go/build"
 	"reflect"
 	"testing"
-
-	"github.com/go-test/deep"
 )
 
 var _ Differ = &testDiffer{}
 
 type testDiffer struct {
-	diff map[string]Directory
+	diff map[string]bool
 }
 
-func (t *testDiffer) Diff() (map[string]Directory, error) {
+func (t *testDiffer) Diff() (map[string]bool, error) {
 	return t.diff, nil
-}
-
-func (t *testDiffer) DiffFiles() (map[string]bool, error) {
-	panic("not implemented")
 }
 
 var _ Packager = &testPackager{}
@@ -48,10 +42,6 @@ func (t *testPackager) PackageFromDir(a string) (*build.Package, error) {
 	}, nil
 }
 
-func (t *testPackager) PackageFromEmptyDir(a string) (*build.Package, error) {
-	return nil, errors.New("not implemented")
-}
-
 func (t *testPackager) PackageFromImport(a string) (*build.Package, error) {
 	for _, v := range t.dirs2Imports {
 		if a == v {
@@ -71,8 +61,8 @@ func TestGTA(t *testing.T) {
 	// A depends on B depends on C
 	// dirC is dirty, we expect them all to be marked
 	difr := &testDiffer{
-		diff: map[string]Directory{
-			"dirC": Directory{Exists: true},
+		diff: map[string]bool{
+			"dirC": true,
 		},
 	}
 
@@ -127,9 +117,9 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	// E depends on F depends on G
 
 	difr := &testDiffer{
-		diff: map[string]Directory{
-			"dirC": Directory{Exists: true},
-			"dirH": Directory{Exists: true},
+		diff: map[string]bool{
+			"dirC": true,
+			"dirH": true,
 		},
 	}
 
@@ -170,11 +160,13 @@ func TestGTA_ChangedPackages(t *testing.T) {
 			"C": []*build.Package{
 				{ImportPath: "A"},
 				{ImportPath: "B"},
+				{ImportPath: "C"},
 				{ImportPath: "D"},
 			},
 			"G": []*build.Package{
 				{ImportPath: "E"},
 				{ImportPath: "F"},
+				{ImportPath: "G"},
 			},
 		},
 		Changes: []*build.Package{
@@ -202,8 +194,10 @@ func TestGTA_ChangedPackages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := deep.Equal(got, want); diff != nil {
-		t.Error(diff)
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %+v", want)
+		t.Errorf(" got: %+v", got)
+		t.Fatal("expected want and got to be equal")
 	}
 }
 
@@ -212,10 +206,10 @@ func TestGTA_Prefix(t *testing.T) {
 	// B depends on C and bar
 	// C depends on qux
 	difr := &testDiffer{
-		diff: map[string]Directory{
-			"dirB":   Directory{Exists: true},
-			"dirC":   Directory{Exists: true},
-			"dirFoo": Directory{Exists: true},
+		diff: map[string]bool{
+			"dirB":   true,
+			"dirC":   true,
+			"dirFoo": true,
 		},
 	}
 
@@ -279,8 +273,8 @@ func TestNoBuildableGoFiles(t *testing.T) {
 	// we have changes but they don't belong to any dirty golang files, so no dirty packages
 	const dir = "docs"
 	difr := &testDiffer{
-		diff: map[string]Directory{
-			dir: Directory{},
+		diff: map[string]bool{
+			dir: false,
 		},
 	}
 
@@ -320,10 +314,10 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		special2 = "specia/case/testdata/multi"
 	)
 	difr := &testDiffer{
-		diff: map[string]Directory{
-			special1: Directory{Exists: true}, // this
-			special2: Directory{Exists: true},
-			"dirC":   Directory{Exists: true},
+		diff: map[string]bool{
+			special1: true, // this
+			special2: true,
+			"dirC":   true,
 		},
 	}
 	graph := &Graph{

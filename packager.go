@@ -22,8 +22,6 @@ func (g *GraphError) Error() string {
 type Packager interface {
 	// Get a go package from directory.
 	PackageFromDir(string) (*build.Package, error)
-	// Get a go package from an empty directory.
-	PackageFromEmptyDir(string) (*build.Package, error)
 	// Get a go package from import path.
 	PackageFromImport(string) (*build.Package, error)
 	// DependentGraph returns the DependentGraph for the current
@@ -44,22 +42,17 @@ type PackageContext struct {
 	ctx *build.Context
 }
 
-// PackageFromDir returns a build package from a directory.
+// PackageFromDir returns a build package from a directory as a string.
 func (p *PackageContext) PackageFromDir(dir string) (*build.Package, error) {
 	return p.ctx.ImportDir(dir, build.ImportComment)
 }
 
-// PackageFromEmptyDir returns a build package from a directory.
-func (p *PackageContext) PackageFromEmptyDir(dir string) (*build.Package, error) {
-	return p.ctx.ImportDir(dir, build.FindOnly)
-}
-
-// PackageFromImport returns a build package from an import path.
+// PackageFromImport returns a build package from an import path as a string.
 func (p *PackageContext) PackageFromImport(importPath string) (*build.Package, error) {
 	return p.ctx.Import(importPath, ".", build.ImportComment)
 }
 
-// DependentGraph returns a dependent graph based on the current Go workspace.
+// DependentGraph returns a dependent graph based on the current golang workspace.
 func (p *PackageContext) DependentGraph() (*Graph, error) {
 	_, graph, errs := importgraph.Build(p.ctx)
 	if len(errs) != 0 {

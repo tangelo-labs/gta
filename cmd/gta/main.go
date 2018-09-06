@@ -31,15 +31,12 @@ func main() {
 		"define changes to be filtered with a set of comma separated prefixes")
 	merge := flag.Bool("merge", false, "diff using the latest merge commit")
 	flagJSON := flag.Bool("json", false, "output list of changes as json")
-	flagBuildableOnly := flag.Bool("buildable-only", true, "keep buildable changed packages only")
 	flag.Parse()
 
-	if *flagJSON && *flagBuildableOnly {
-		log.Fatal("-buildable-only must be set to false when using -json")
-	}
-
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewDiffer(*merge)),
+		gta.SetDiffer(&gta.Git{
+			UseMergeCommit: *merge,
+		}),
 		gta.SetPrefixes(strings.Split(*include, ",")...),
 	}
 
@@ -61,7 +58,7 @@ func main() {
 		return
 	}
 
-	strung := stringify(packages.AllChanges, *flagBuildableOnly)
+	strung := stringify(packages.AllChanges)
 
 	if terminal.IsTerminal(syscall.Stdin) {
 		for _, pkg := range strung {
@@ -73,12 +70,10 @@ func main() {
 	fmt.Println(strings.Join(strung, " "))
 }
 
-func stringify(pkgs []*build.Package, validOnly bool) []string {
+func stringify(pkgs []*build.Package) []string {
 	var out []string
 	for _, pkg := range pkgs {
-		if !validOnly || (validOnly && pkg.SrcRoot != "") {
-			out = append(out, pkg.ImportPath)
-		}
+		out = append(out, pkg.ImportPath)
 	}
 	return out
 }
