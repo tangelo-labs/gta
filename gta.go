@@ -180,6 +180,10 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 	// value is true when the package was deleted.
 	changed := make(map[string]bool)
 	for abs, dir := range dirs {
+		if !dir.Exists && !hasGoFile(dir.Files) {
+			continue
+		}
+
 		// Avoid .foo, _foo, and testdata directory trees how the go tool does!
 		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
 		// Above link is not guaranteed to work.
