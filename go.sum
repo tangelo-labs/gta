@@ -1,0 +1,10 @@
+github.com/go-test/deep v1.0.0 h1:TZfzRUm4tGUasUQAAKI3BRcGtxGfdpe6hCkqYD9HMM4=
+github.com/go-test/deep v1.0.0/go.mod h1:wGDj63lr65AM2AQyKZd/NYHGb0R+1RLqB8NKt3aSFNA=
+github.com/pkg/errors v0.8.0 h1:WdK/asTD0HN+q6hsWO3/vpuAkAr+tw6aNJNDFFf0+qw=
+github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
+golang.org/x/crypto v0.0.0-20180527072434-ab813273cd59 h1:hk3yo72LXLapY9EXVttc3Z1rLOxT9IuAPPX3GpY2+jo=
+golang.org/x/crypto v0.0.0-20180527072434-ab813273cd59/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
+golang.org/x/sys v0.0.0-20180612142214-a9e25c09b96b h1:Alsw3Wc6E7GDN4eBfL2kDsr2kGY3jIK80LVwqVmSQQA=
+golang.org/x/sys v0.0.0-20180612142214-a9e25c09b96b/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+golang.org/x/tools v0.0.0-20181031165350-3a10b9bf0a52 h1:PNtPCxiQxJpaFZcF6G/CXZHyw3MuIHuJMPbG29ii7K8=
+golang.org/x/tools v0.0.0-20181031165350-3a10b9bf0a52/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
