@@ -1,0 +1,6 @@
+#!/bin/bash
+
+set -o errexit -o nounset
+
+go test -mod=vendor ./...
+go test -mod=vendor -tags -integration ./...
