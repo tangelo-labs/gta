@@ -52,6 +52,36 @@ func (p *Packages) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// UnmarshallJSON used by gtartifacts when providing a changed package list
+// see `useChangedPackagesFrom()`
+func (p *Packages) UnmarshalJSON(b []byte) error {
+	var s struct {
+		Dependencies map[string][]string `json:"dependencies,omitempty"`
+		Changes      []string            `json:"changes,omitempty"`
+		AllChanges   []string            `json:"all_changes,omitempty"`
+	}
+
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+
+	for k, v := range s.Dependencies {
+		for kk, vv := range v {
+			p.Dependencies[k][kk] = &build.Package{Name: "main", ImportPath: vv}
+		}
+	}
+
+	for _, v := range s.Changes {
+		p.Changes = append(p.Changes, &build.Package{Name: "main", ImportPath: v})
+	}
+
+	for _, v := range s.AllChanges {
+		p.AllChanges = append(p.AllChanges, &build.Package{Name: "main", ImportPath: v})
+	}
+
+	return nil
+}
+
 // A GTA provides a method of building dirty packages, and their dependent
 // packages.
 type GTA struct {
