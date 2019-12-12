@@ -7,6 +7,7 @@ in the LICENSE file.
 package gta
 
 import (
+	"encoding/json"
 	"errors"
 	"go/build"
 	"reflect"
@@ -377,6 +378,37 @@ func TestSpecialCaseDirectory(t *testing.T) {
 	}
 
 	got := pkgs.AllChanges
+
+	if !reflect.DeepEqual(want, got) {
+		t.Errorf("want: %v", want)
+		t.Errorf(" got: %v", got)
+		t.Fatal("expected want and got to be equal")
+	}
+}
+
+func TestUnmarshalJSON(t *testing.T) {
+	want := &Packages{
+		Changes: []*build.Package{
+			{
+				Name:       "main",
+				ImportPath: "do/teams/compute/octopus2",
+			},
+		},
+		AllChanges: []*build.Package{
+			{
+				Name:       "main",
+				ImportPath: "do/teams/compute/octopus2",
+			},
+		},
+	}
+
+	in := []byte(`{"changes":[{"name":"main","import_path":"do/teams/compute/octopus2"}],"all_changes":[{"name": "main","import_path": "do/teams/compute/octopus2"}]}`)
+
+	got := new(Packages)
+	err := json.Unmarshal(in, got)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if !reflect.DeepEqual(want, got) {
 		t.Errorf("want: %v", want)
