@@ -388,21 +388,29 @@ func TestSpecialCaseDirectory(t *testing.T) {
 
 func TestUnmarshalJSON(t *testing.T) {
 	want := &Packages{
+		Dependencies: map[string][]*build.Package{
+			"do/tools/build/gta": []*build.Package{
+				{
+					ImportPath: "do/tools/build/gta/cmd/gta",
+				},
+				{
+					ImportPath: "do/tools/build/gtartifacts",
+				},
+			},
+		},
 		Changes: []*build.Package{
 			{
-				Name:       "main",
-				ImportPath: "do/teams/compute/octopus2",
+				ImportPath: "do/teams/compute/octopus",
 			},
 		},
 		AllChanges: []*build.Package{
 			{
-				Name:       "main",
-				ImportPath: "do/teams/compute/octopus2",
+				ImportPath: "do/teams/compute/octopus",
 			},
 		},
 	}
 
-	in := []byte(`{"changes":[{"name":"main","import_path":"do/teams/compute/octopus2"}],"all_changes":[{"name": "main","import_path": "do/teams/compute/octopus2"}]}`)
+	in := []byte(`{"dependencies":{"do/tools/build/gta":["do/tools/build/gta/cmd/gta","do/tools/build/gtartifacts"]},"changes":["do/teams/compute/octopus"],"all_changes":["do/teams/compute/octopus"]}`)
 
 	got := new(Packages)
 	err := json.Unmarshal(in, got)

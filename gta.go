@@ -55,37 +55,29 @@ func (p *Packages) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON used by gtartifacts when providing a changed package list
 // see `useChangedPackagesFrom()`
 func (p *Packages) UnmarshalJSON(b []byte) error {
-	type simpleBuildPackage struct {
-		Name       string `json:"name"`
-		ImportPath string `json:"import_path"`
-	}
-
 	var s struct {
-		Dependencies map[string][]string  `json:"dependencies,omitempty"`
-		Changes      []simpleBuildPackage `json:"changes,omitempty"`
-		AllChanges   []simpleBuildPackage `json:"all_changes,omitempty"`
+		Dependencies map[string][]string `json:"dependencies,omitempty"`
+		Changes      []string            `json:"changes,omitempty"`
+		AllChanges   []string            `json:"all_changes,omitempty"`
 	}
 
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
 	}
 
+	p.Dependencies = make(map[string][]*build.Package)
 	for k, v := range s.Dependencies {
-		for kk, vv := range v {
-			t := new(simpleBuildPackage)
-			if err := json.Unmarshal([]byte(vv), &t); err != nil {
-				return err
-			}
-			p.Dependencies[k][kk] = &build.Package{Name: t.Name, ImportPath: t.ImportPath}
+		for _, vv := range v {
+			p.Dependencies[k] = append(p.Dependencies[k], &build.Package{ImportPath: vv})
 		}
 	}
 
 	for _, v := range s.Changes {
-		p.Changes = append(p.Changes, &build.Package{Name: v.Name, ImportPath: v.ImportPath})
+		p.Changes = append(p.Changes, &build.Package{ImportPath: v})
 	}
 
 	for _, v := range s.AllChanges {
-		p.AllChanges = append(p.AllChanges, &build.Package{Name: v.Name, ImportPath: v.ImportPath})
+		p.AllChanges = append(p.AllChanges, &build.Package{ImportPath: v})
 	}
 
 	return nil
