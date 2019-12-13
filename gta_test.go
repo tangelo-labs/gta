@@ -410,9 +410,7 @@ func TestUnmarshalJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %v", want)
-		t.Errorf(" got: %v", got)
-		t.Fatal("expected want and got to be equal")
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v; want %v", got, want)
 	}
 }
