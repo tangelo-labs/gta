@@ -39,27 +39,26 @@ type Packages struct {
 	AllChanges []*build.Package
 }
 
+type packagesJSON struct {
+	Dependencies map[string][]string `json:"dependencies,omitempty"`
+	Changes      []string            `json:"changes,omitempty"`
+	AllChanges   []string            `json:"all_changes,omitempty"`
+}
+
 // MarshalJSON implements the json.Marshaler interface.
 func (p *Packages) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Dependencies map[string][]string `json:"dependencies,omitempty"`
-		Changes      []string            `json:"changes,omitempty"`
-		AllChanges   []string            `json:"all_changes,omitempty"`
-	}{
+	s := packagesJSON{
 		Dependencies: mapify(p.Dependencies),
 		Changes:      stringify(p.Changes),
 		AllChanges:   stringify(p.AllChanges),
-	})
+	}
+	return json.Marshal(s)
 }
 
 // UnmarshalJSON used by gtartifacts when providing a changed package list
 // see `useChangedPackagesFrom()`
 func (p *Packages) UnmarshalJSON(b []byte) error {
-	var s struct {
-		Dependencies map[string][]string `json:"dependencies,omitempty"`
-		Changes      []string            `json:"changes,omitempty"`
-		AllChanges   []string            `json:"all_changes,omitempty"`
-	}
+	s := new(packagesJSON)
 
 	if err := json.Unmarshal(b, &s); err != nil {
 		return err
