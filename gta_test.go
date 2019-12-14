@@ -422,3 +422,43 @@ func TestUnmarshalJSON(t *testing.T) {
 		t.Errorf("got %v; want %v", got, want)
 	}
 }
+
+func TestJSONRoundtrip(t *testing.T) {
+	want := &Packages{
+		Dependencies: map[string][]*build.Package{
+			"do/tools/build/gta": []*build.Package{
+				{
+					ImportPath: "do/tools/build/gta/cmd/gta",
+				},
+				{
+					ImportPath: "do/tools/build/gtartifacts",
+				},
+			},
+		},
+		Changes: []*build.Package{
+			{
+				ImportPath: "do/teams/compute/octopus",
+			},
+		},
+		AllChanges: []*build.Package{
+			{
+				ImportPath: "do/teams/compute/octopus",
+			},
+		},
+	}
+
+	b, err := json.Marshal(want)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := new(Packages)
+	err = json.Unmarshal(b, got)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v; want %v", got, want)
+	}
+}
