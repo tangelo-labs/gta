@@ -28,8 +28,8 @@ type Differ interface {
 	DiffFiles() (map[string]bool, error)
 }
 
-// NewDiffer returns a Differ that determines differences using git.
-func NewDiffer(useMergeCommit bool) Differ {
+// NewGitDiffer returns a Differ that determines differences using git.
+func NewGitDiffer(useMergeCommit bool) Differ {
 	return &git{
 		useMergeCommit: useMergeCommit,
 	}

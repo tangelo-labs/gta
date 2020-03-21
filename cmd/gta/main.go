@@ -46,7 +46,7 @@ func main() {
 	}
 
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewDiffer(*merge)),
+		gta.SetDiffer(gta.NewGitDiffer(*merge)),
 		gta.SetPrefixes(strings.Split(*include, ",")...),
 	}
 
