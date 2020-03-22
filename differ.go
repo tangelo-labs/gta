@@ -24,15 +24,38 @@ type Differ interface {
 	// have been modified.
 	Diff() (map[string]Directory, error)
 
-	// DiffFiles returns a set of absolute pathed files that have been modified.
+	// DiffFiles returns a map whose keys are absolute files paths. A map value
+	// is true when the file exists.
 	DiffFiles() (map[string]bool, error)
 }
 
 // NewGitDiffer returns a Differ that determines differences using git.
 func NewGitDiffer(useMergeCommit bool) Differ {
-	return &git{
+	g := &git{
 		useMergeCommit: useMergeCommit,
 	}
+
+	return &differ{
+		diff: g.diff,
+	}
+}
+
+// NewFileDiffer returns a Differ that operates on a list of absolute paths of
+// changed files.
+func NewFileDiffer(files []string) Differ {
+	m := make(map[string]struct{}, len(files))
+
+	for _, v := range files {
+		m[v] = struct{}{}
+	}
+
+	return &differ{
+		diff: func() (map[string]struct{}, error) { return m, nil },
+	}
+}
+
+type differ struct {
+	diff func() (map[string]struct{}, error)
 }
 
 // git implements the Differ interface using a git version control method.
@@ -51,8 +74,8 @@ type Directory struct {
 
 // Diff returns a set of changed directories. The keys of the returned map are
 // absolute paths.
-func (g *git) Diff() (map[string]Directory, error) {
-	files, err := g.diff()
+func (d *differ) Diff() (map[string]Directory, error) {
+	files, err := d.diff()
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +99,8 @@ func (g *git) Diff() (map[string]Directory, error) {
 // DiffFiles returns a set of changed files. The keys of the returned map are
 // absolute paths. The map values indicate whether or not the file exists: a
 // false value means the file was deleted.
-func (g *git) DiffFiles() (map[string]bool, error) {
-	files, err := g.diff()
+func (d *differ) DiffFiles() (map[string]bool, error) {
+	files, err := d.diff()
 	if err != nil {
 		return nil, err
 	}
@@ -180,4 +203,8 @@ func diffPaths(root string, r io.Reader) (map[string]struct{}, error) {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)
+}
+
+type fileDiffer struct {
+	changedFiles map[string]struct{}
 }

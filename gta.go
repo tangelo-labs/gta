@@ -90,10 +90,11 @@ type GTA struct {
 	prefixes []string
 }
 
-// New returns a new GTA with various options passed to New.
+// New returns a new GTA with various options passed to New. Options will be
+// applied in order so that later options can override earlier options.
 func New(opts ...Option) (*GTA, error) {
 	gta := &GTA{
-		differ:   &git{},
+		differ:   NewGitDiffer(false),
 		packager: DefaultPackager,
 	}
 

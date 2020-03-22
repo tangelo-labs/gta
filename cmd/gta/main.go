@@ -12,11 +12,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -39,15 +42,30 @@ func main() {
 	merge := flag.Bool("merge", false, "diff using the latest merge commit")
 	flagJSON := flag.Bool("json", false, "output list of changes as json")
 	flagBuildableOnly := flag.Bool("buildable-only", true, "keep buildable changed packages only")
+	flagChangedFiles := flag.String("changed-files", "", "path to a file containing a newline separated list of files that have changed")
 	flag.Parse()
 
 	if *flagJSON && *flagBuildableOnly {
 		log.Fatal("-buildable-only must be set to false when using -json")
 	}
 
+	if *merge && len(*flagChangedFiles) > 0 {
+		log.Fatal("changed files must not be provided when using the latest merge commit")
+	}
+
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewGitDiffer(*merge)),
 		gta.SetPrefixes(strings.Split(*include, ",")...),
+	}
+
+	if len(*flagChangedFiles) == 0 {
+		// override the differ to use the git differ instead.
+		options = append(options, gta.SetDiffer(gta.NewGitDiffer(*merge)))
+	} else {
+		sl, err := changedFiles(*flagChangedFiles)
+		if err != nil {
+			log.Fatal(fmt.Errorf("could not read changed file list: %w", err))
+		}
+		options = append(options, gta.SetDiffer(gta.NewFileDiffer(sl)))
 	}
 
 	gt, err := gta.New(options...)
@@ -88,4 +106,35 @@ func stringify(pkgs []*build.Package, validOnly bool) []string {
 		}
 	}
 	return out
+}
+
+func changedFiles(fn string) ([]string, error) {
+	b, err := ioutil.ReadFile(fn)
+	if err != nil {
+		return nil, err
+	}
+
+	sl := strings.Split(string(b), "\n")
+	n := 0
+	for _, s := range sl {
+		if !keepChangedFile(s) {
+			continue
+		}
+
+		if !filepath.IsAbs(s) {
+			return nil, errors.New("all changed files paths must be absolute paths")
+		}
+
+		sl[n] = s
+		n++
+	}
+
+	return sl[:n], nil
+}
+
+func keepChangedFile(s string) bool {
+	// Trim spaces, especially in case the newlines were CRLF instead of LF.
+	s = strings.TrimSpace(s)
+
+	return len(s) > 0
 }
