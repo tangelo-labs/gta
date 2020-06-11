@@ -133,7 +133,7 @@ func (g *git) diff() (map[string]struct{}, error) {
 				parents := strings.TrimSpace(string(out))
 				parentSplit := strings.Split(parents, " ")
 				parent1 = parentSplit[0]
-				if len(parentSplit) > 2 {
+				if len(parentSplit) >= 2 {
 					rightwardParents = parentSplit[1:]
 				}
 			}
