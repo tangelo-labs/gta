@@ -126,17 +126,16 @@ func (g *git) diff() (map[string]struct{}, error) {
 			parent1 := "origin/master"
 			rightwardParents := []string{"HEAD"}
 			if g.useMergeCommit {
-				out, err := exec.Command("git", "log", "-1", "--merges", "--pretty=format:%p").Output()
+				out, err := exec.Command("git", "log", "-1", "--pretty=format:%p").Output()
 				if err != nil {
 					return nil, err
 				}
 				parents := strings.TrimSpace(string(out))
 				parentSplit := strings.Split(parents, " ")
-				if len(parentSplit) < 2 {
-					return nil, fmt.Errorf("could not discover parent merge commits")
-				}
 				parent1 = parentSplit[0]
-				rightwardParents = parentSplit[1:]
+				if len(parentSplit) > 2 {
+					rightwardParents = parentSplit[1:]
+				}
 			}
 
 			files := make(map[string]struct{})
