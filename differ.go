@@ -113,6 +113,31 @@ func (d *differ) DiffFiles() (map[string]bool, error) {
 	return existsFiles, nil
 }
 
+func getMergeParents() (parent1 string, rightwardParents []string, err error) {
+	out, err := exec.Command("git", "log", "-1", "--pretty=format:%p").Output()
+	if err != nil {
+		return
+	}
+	parents := strings.TrimSpace(string(out))
+	parentSplit := strings.Split(parents, " ")
+
+	// for merge commits, parents will include both values
+	if len(parentSplit) >= 2 {
+		parent1 = parentSplit[0]
+		rightwardParents = parentSplit[1:]
+		return
+	}
+
+	// for squash-merge/rebase commits, get the most recent merge commit hash and use as left parent
+	out, err = exec.Command("git", "log", "-1", "--merges", "--pretty=format:%h").Output()
+	if err != nil {
+		return
+	}
+	parent1 = strings.TrimSpace(string(out))
+	rightwardParents = []string{"HEAD"}
+	return
+}
+
 // diff returns a set of changed files.
 func (g *git) diff() (map[string]struct{}, error) {
 	g.onceDiff.Do(func() {
@@ -126,15 +151,9 @@ func (g *git) diff() (map[string]struct{}, error) {
 			parent1 := "origin/master"
 			rightwardParents := []string{"HEAD"}
 			if g.useMergeCommit {
-				out, err := exec.Command("git", "log", "-1", "--pretty=format:%p").Output()
+				parent1, rightwardParents, err = getMergeParents()
 				if err != nil {
 					return nil, err
-				}
-				parents := strings.TrimSpace(string(out))
-				parentSplit := strings.Split(parents, " ")
-				parent1 = parentSplit[0]
-				if len(parentSplit) >= 2 {
-					rightwardParents = parentSplit[1:]
 				}
 			}
 
