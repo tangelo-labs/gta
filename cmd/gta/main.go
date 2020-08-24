@@ -36,7 +36,7 @@ func init() {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
-	branch := flag.String("branch", "origin/master", "branch to diff against")
+	base := flag.String("base", "origin/master", "base, branch to diff against")
 	include := flag.String("include",
 		"do/doge/,do/services/,do/teams/,do/tools/,do/exp/",
 		"define changes to be filtered with a set of comma separated prefixes")
@@ -60,7 +60,7 @@ func main() {
 
 	if len(*flagChangedFiles) == 0 {
 		// override the differ to use the git differ instead.
-		options = append(options, gta.SetDiffer(gta.NewGitDiffer(*merge, *branch)))
+		options = append(options, gta.SetDiffer(gta.NewGitDiffer(*merge, *base)))
 	} else {
 		sl, err := changedFiles(*flagChangedFiles)
 		if err != nil {

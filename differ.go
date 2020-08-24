@@ -30,10 +30,10 @@ type Differ interface {
 }
 
 // NewGitDiffer returns a Differ that determines differences using git.
-func NewGitDiffer(useMergeCommit bool, branch string) Differ {
+func NewGitDiffer(useMergeCommit bool, base string) Differ {
 	g := &git{
 		useMergeCommit: useMergeCommit,
-		branch:         branch,
+		base:         base,
 	}
 
 	return &differ{
@@ -61,7 +61,7 @@ type differ struct {
 
 // git implements the Differ interface using a git version control method.
 type git struct {
-	branch         string
+	base         string
 	useMergeCommit bool
 	onceDiff       sync.Once
 	changedFiles   map[string]struct{}
@@ -150,7 +150,7 @@ func (g *git) diff() (map[string]struct{}, error) {
 				return nil, err
 			}
 			root := strings.TrimSpace(string(out))
-			parent1 := g.branch
+			parent1 := g.base
 			rightwardParents := []string{"HEAD"}
 			if g.useMergeCommit {
 				parent1, rightwardParents, err = getMergeParents()
