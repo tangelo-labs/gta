@@ -5,7 +5,7 @@ Use of this source code is governed by the Apache 2 license that can be found
 in the LICENSE file.
 */
 
-// Command gta uses git to find the subset of code changes from origin/master
+// Command gta uses git to find the subset of code changes from a branch
 // and then builds the list of go packages that have changed as a result,
 // including all dependent go packages.
 package main
@@ -36,6 +36,7 @@ func init() {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
+	branch := flag.String("branch", "origin/master", "branch to diff against")
 	include := flag.String("include",
 		"do/doge/,do/services/,do/teams/,do/tools/,do/exp/",
 		"define changes to be filtered with a set of comma separated prefixes")
@@ -59,7 +60,7 @@ func main() {
 
 	if len(*flagChangedFiles) == 0 {
 		// override the differ to use the git differ instead.
-		options = append(options, gta.SetDiffer(gta.NewGitDiffer(*merge)))
+		options = append(options, gta.SetDiffer(gta.NewGitDiffer(*merge, *branch)))
 	} else {
 		sl, err := changedFiles(*flagChangedFiles)
 		if err != nil {
