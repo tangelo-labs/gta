@@ -41,7 +41,7 @@ func SetUseMergeCommit(useMergeCommit bool) GitDifferOption {
 
 func SetBaseBranch(baseBranch string) GitDifferOption {
 	return func(gd *git) {
-		gd.base = baseBranch
+		gd.baseBranch = baseBranch
 	}
 }
 
@@ -49,7 +49,7 @@ func SetBaseBranch(baseBranch string) GitDifferOption {
 func NewGitDiffer(opts ...GitDifferOption) Differ {
 	g := &git{
 		useMergeCommit: false,
-		base:           "origin/master",
+		baseBranch:     "origin/master",
 	}
 
 	for _, opt := range opts {
@@ -81,7 +81,7 @@ type differ struct {
 
 // git implements the Differ interface using a git version control method.
 type git struct {
-	base           string
+	baseBranch     string
 	useMergeCommit bool
 	onceDiff       sync.Once
 	changedFiles   map[string]struct{}
@@ -170,7 +170,7 @@ func (g *git) diff() (map[string]struct{}, error) {
 				return nil, err
 			}
 			root := strings.TrimSpace(string(out))
-			parent1 := g.base
+			parent1 := g.baseBranch
 			rightwardParents := []string{"HEAD"}
 			if g.useMergeCommit {
 				parent1, rightwardParents, err = getMergeParents()
