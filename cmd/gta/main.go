@@ -60,7 +60,11 @@ func main() {
 
 	if len(*flagChangedFiles) == 0 {
 		// override the differ to use the git differ instead.
-		options = append(options, gta.SetDiffer(gta.NewGitDiffer(*merge, *base)))
+		gitDifferOptions := []gta.GitDifferOption{
+			gta.SetBaseBranch(*base),
+			gta.SetUseMergeCommit(*merge),
+		}
+		options = append(options, gta.SetDiffer(gta.NewGitDiffer(gitDifferOptions...)))
 	} else {
 		sl, err := changedFiles(*flagChangedFiles)
 		if err != nil {

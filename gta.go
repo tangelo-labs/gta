@@ -94,7 +94,7 @@ type GTA struct {
 // applied in order so that later options can override earlier options.
 func New(opts ...Option) (*GTA, error) {
 	gta := &GTA{
-		differ:   NewGitDiffer(false, "origin/master"),
+		differ:   NewGitDiffer(),
 		packager: DefaultPackager,
 	}
 

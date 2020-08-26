@@ -29,11 +29,31 @@ type Differ interface {
 	DiffFiles() (map[string]bool, error)
 }
 
+// GitDifferOption is an option function used to modify a git differ
+type GitDifferOption func(*git)
+
+// SetUseMergeCommit sets the useMergeCommit field on a git differ
+func SetUseMergeCommit(useMergeCommit bool) GitDifferOption {
+	return func(gd *git) {
+		gd.useMergeCommit = useMergeCommit
+	}
+}
+
+func SetBaseBranch(baseBranch string) GitDifferOption {
+	return func(gd *git) {
+		gd.base = baseBranch
+	}
+}
+
 // NewGitDiffer returns a Differ that determines differences using git.
-func NewGitDiffer(useMergeCommit bool, base string) Differ {
+func NewGitDiffer(opts ...GitDifferOption) Differ {
 	g := &git{
-		useMergeCommit: useMergeCommit,
-		base:         base,
+		useMergeCommit: false,
+		base:           "origin/master",
+	}
+
+	for _, opt := range opts {
+		opt(g)
 	}
 
 	return &differ{
@@ -61,7 +81,7 @@ type differ struct {
 
 // git implements the Differ interface using a git version control method.
 type git struct {
-	base         string
+	base           string
 	useMergeCommit bool
 	onceDiff       sync.Once
 	changedFiles   map[string]struct{}
