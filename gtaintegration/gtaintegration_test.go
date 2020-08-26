@@ -93,7 +93,7 @@ func TestPackageRemoval(t *testing.T) {
 		t.Logf("\n%s", out)
 	}
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewGitDiffer(false)),
+		gta.SetDiffer(gta.NewGitDiffer()),
 		gta.SetPrefixes("gtaintegration"),
 	}
 
@@ -219,7 +219,7 @@ func TestPackageRemoval_AllGoFilesDeleted(t *testing.T) {
 		t.Logf("\n%s", out)
 	}
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewGitDiffer(false)),
+		gta.SetDiffer(gta.NewGitDiffer()),
 		gta.SetPrefixes("gtaintegration"),
 	}
 
@@ -294,7 +294,7 @@ func TestPackageRemoval_RemoveDirectory(t *testing.T) {
 		t.Logf("\n%s", out)
 	}
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewGitDiffer(false)),
+		gta.SetDiffer(gta.NewGitDiffer()),
 		gta.SetPrefixes("gtaintegration"),
 	}
 
@@ -369,7 +369,7 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 		t.Logf("\n%s", out)
 	}
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewGitDiffer(false)),
+		gta.SetDiffer(gta.NewGitDiffer()),
 		gta.SetPrefixes("gtaintegration"),
 	}
 
@@ -450,7 +450,7 @@ func TestNonPackageRemoval(t *testing.T) {
 		t.Logf("\n%s", out)
 	}
 	options := []gta.Option{
-		gta.SetDiffer(gta.NewGitDiffer(false)),
+		gta.SetDiffer(gta.NewGitDiffer()),
 		gta.SetPrefixes("gtaintegration"),
 	}
 
