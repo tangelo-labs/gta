@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 )
 
 var _ Differ = &testDiffer{}
@@ -209,8 +209,8 @@ func TestGTA_ChangedPackages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := deep.Equal(got, want); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(got, want); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 

@@ -18,7 +18,7 @@ import (
 
 	"do/tools/build/gta"
 
-	"github.com/go-test/deep"
+	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
 )
 
@@ -164,8 +164,8 @@ func TestPackageRemoval(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -256,8 +256,8 @@ func TestPackageRemoval_AllGoFilesDeleted(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -331,8 +331,8 @@ func TestPackageRemoval_RemoveDirectory(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -412,8 +412,8 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -493,8 +493,8 @@ func TestPackageRemoval_MovePackage_NonMasterBranch(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -551,8 +551,8 @@ func TestNonPackageRemoval(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
-		t.Error(diff)
+	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 func testMain(m *testing.M) error {
