@@ -417,6 +417,87 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 	}
 }
 
+func TestPackageRemoval_MovePackage_NonMasterBranch(t *testing.T) {
+	ctx := context.Background()
+	if _, err := runGit(ctx, ".", "checkout", "-b", t.Name(), "master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// move some files to a different directory
+	if _, err := runGit(ctx, ".", "mv", "src/gtaintegration/movedfrom", "src/gtaintegration/movedto"); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "status", "--short")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+
+	if _, err := runGit(ctx, ".", "commit", "-a", "-m", "delete some stuff"); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "diff", "origin/feature-branch...HEAD", "--name-only", "--no-renames")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+	options := []gta.Option{
+		gta.SetDiffer(gta.NewGitDiffer(gta.SetBaseBranch("origin/feature-branch"))),
+		gta.SetPrefixes("gtaintegration"),
+	}
+
+	gt, err := gta.New(options...)
+	if err != nil {
+		t.Fatalf("can't prepare gta: %v", err)
+	}
+
+	want := &gta.Packages{
+		Dependencies: map[string][]*build.Package{
+			"gtaintegration/movedfrom": []*build.Package{
+				&build.Package{
+					ImportPath: "gtaintegration/movedfromclient",
+				},
+			},
+		},
+		Changes: []*build.Package{
+			&build.Package{
+				ImportPath: "gtaintegration/movedfrom",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedto",
+			},
+		},
+		AllChanges: []*build.Package{
+			&build.Package{
+				ImportPath: "gtaintegration/movedfrom",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedfromclient",
+			},
+			&build.Package{
+				ImportPath: "gtaintegration/movedto",
+			},
+		},
+	}
+
+	got, err := gt.ChangedPackages()
+	if err != nil {
+		t.Fatalf("err = %q; want nil", err)
+	}
+
+	if diff := deep.Equal(mapFromPackages(t, got), mapFromPackages(t, want)); diff != nil {
+		t.Error(diff)
+	}
+}
+
 func TestNonPackageRemoval(t *testing.T) {
 	ctx := context.Background()
 	if _, err := runGit(ctx, ".", "checkout", "-b", t.Name(), "master"); err != nil {
@@ -536,6 +617,11 @@ func createRepo(path string) error {
 
 	// create an origin/master branch from master to simulate a remote.
 	if _, err := runGit(ctx, path, "branch", "origin/master"); err != nil {
+		return err
+	}
+
+	// create an origin/feature-branch branch from master to simulate a non-master remote.
+	if _, err := runGit(ctx, path, "branch", "origin/feature-branch"); err != nil {
 		return err
 	}
 
