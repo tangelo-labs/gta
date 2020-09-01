@@ -39,6 +39,7 @@ func SetUseMergeCommit(useMergeCommit bool) GitDifferOption {
 	}
 }
 
+// SetBaseBranch sets the baseBranch field on a git differ
 func SetBaseBranch(baseBranch string) GitDifferOption {
 	return func(gd *git) {
 		gd.baseBranch = baseBranch
