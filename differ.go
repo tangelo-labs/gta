@@ -211,7 +211,7 @@ func (g *git) diff() (map[string]struct{}, error) {
 			return files, nil
 		}()
 		if err != nil {
-			g.diffErr = nil
+			g.diffErr = err
 			return
 		}
 
