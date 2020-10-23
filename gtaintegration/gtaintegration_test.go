@@ -16,7 +16,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"do/tools/build/gta"
+	"github.com/digitalocean/gta"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
