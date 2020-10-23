@@ -1,0 +1,19 @@
+name: test
+on: [push, pull_request]
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-18.04
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ['1.14','1.15']
+    steps:
+    - name: setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go }}
+    - name: checkout
+      uses: actions/checkout@v2
+    - name: test
+      run: $GITHUB_WORKSPACE/scripts/ci.sh
