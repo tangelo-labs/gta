@@ -36,9 +36,9 @@ func init() {
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
-	base := flag.String("base", "origin/master", "base, branch to diff against")
-	include := flag.String("include", "", "define changes to be filtered with a set of comma separated prefixes")
-	merge := flag.Bool("merge", false, "diff using the latest merge commit")
+	flagBase := flag.String("base", "origin/master", "base, branch to diff against")
+	flagInclude := flag.String("include", "", "define changes to be filtered with a set of comma separated prefixes")
+	flagMerge := flag.Bool("merge", false, "diff using the latest merge commit")
 	flagJSON := flag.Bool("json", false, "output list of changes as json")
 	flagBuildableOnly := flag.Bool("buildable-only", true, "keep buildable changed packages only")
 	flagChangedFiles := flag.String("changed-files", "", "path to a file containing a newline separated list of files that have changed")
@@ -48,19 +48,19 @@ func main() {
 		log.Fatal("-buildable-only must be set to false when using -json")
 	}
 
-	if *merge && len(*flagChangedFiles) > 0 {
+	if *flagMerge && len(*flagChangedFiles) > 0 {
 		log.Fatal("changed files must not be provided when using the latest merge commit")
 	}
 
 	options := []gta.Option{
-		gta.SetPrefixes(strings.Split(*include, ",")...),
+		gta.SetPrefixes(strings.Split(*flagInclude, ",")...),
 	}
 
 	if len(*flagChangedFiles) == 0 {
 		// override the differ to use the git differ instead.
 		gitDifferOptions := []gta.GitDifferOption{
-			gta.SetBaseBranch(*base),
-			gta.SetUseMergeCommit(*merge),
+			gta.SetBaseBranch(*flagBase),
+			gta.SetUseMergeCommit(*flagMerge),
 		}
 		options = append(options, gta.SetDiffer(gta.NewGitDiffer(gitDifferOptions...)))
 	} else {
