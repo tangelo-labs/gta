@@ -38,7 +38,7 @@ type testPackager struct {
 	errs         map[string]error
 }
 
-func (t *testPackager) PackageFromDir(a string) (*build.Package, error) {
+func (t *testPackager) PackageFromDir(a string) (*Package, error) {
 	// we pass back an err
 	err, eok := t.errs[a]
 	if eok {
@@ -50,19 +50,19 @@ func (t *testPackager) PackageFromDir(a string) (*build.Package, error) {
 		return nil, errors.New("dir not found")
 	}
 
-	return &build.Package{
+	return &Package{
 		ImportPath: path,
 	}, nil
 }
 
-func (t *testPackager) PackageFromEmptyDir(a string) (*build.Package, error) {
+func (t *testPackager) PackageFromEmptyDir(a string) (*Package, error) {
 	return nil, errors.New("not implemented")
 }
 
-func (t *testPackager) PackageFromImport(a string) (*build.Package, error) {
+func (t *testPackager) PackageFromImport(a string) (*Package, error) {
 	for _, v := range t.dirs2Imports {
 		if a == v {
-			return &build.Package{
+			return &Package{
 				ImportPath: a,
 			}, nil
 		}
@@ -103,10 +103,10 @@ func TestGTA(t *testing.T) {
 		graph: graph,
 		errs:  make(map[string]error),
 	}
-	want := []*build.Package{
-		&build.Package{ImportPath: "A"},
-		&build.Package{ImportPath: "B"},
-		&build.Package{ImportPath: "C"},
+	want := []*Package{
+		&Package{ImportPath: "A"},
+		&Package{ImportPath: "B"},
+		&Package{ImportPath: "C"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
@@ -173,22 +173,22 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	}
 
 	want := &Packages{
-		Dependencies: map[string][]*build.Package{
-			"C": []*build.Package{
+		Dependencies: map[string][]*Package{
+			"C": []*Package{
 				{ImportPath: "A"},
 				{ImportPath: "B"},
 				{ImportPath: "D"},
 			},
-			"G": []*build.Package{
+			"G": []*Package{
 				{ImportPath: "E"},
 				{ImportPath: "F"},
 			},
 		},
-		Changes: []*build.Package{
+		Changes: []*Package{
 			{ImportPath: "C"},
 			{ImportPath: "G"},
 		},
-		AllChanges: []*build.Package{
+		AllChanges: []*Package{
 			{ImportPath: "A"},
 			{ImportPath: "B"},
 			{ImportPath: "C"},
@@ -258,9 +258,9 @@ func TestGTA_Prefix(t *testing.T) {
 		graph: graph,
 		errs:  make(map[string]error),
 	}
-	want := []*build.Package{
-		&build.Package{ImportPath: "C"},
-		&build.Package{ImportPath: "foo"},
+	want := []*Package{
+		&Package{ImportPath: "C"},
+		&Package{ImportPath: "foo"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr), SetPrefixes("foo", "C"))
@@ -299,7 +299,7 @@ func TestNoBuildableGoFiles(t *testing.T) {
 		},
 	}
 
-	var want []*build.Package
+	var want []*Package
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
 	if err != nil {
@@ -361,10 +361,10 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		},
 	}
 
-	want := []*build.Package{
-		&build.Package{ImportPath: "A"},
-		&build.Package{ImportPath: "B"},
-		&build.Package{ImportPath: "C"},
+	want := []*Package{
+		&Package{ImportPath: "A"},
+		&Package{ImportPath: "B"},
+		&Package{ImportPath: "C"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
@@ -388,8 +388,8 @@ func TestSpecialCaseDirectory(t *testing.T) {
 
 func TestUnmarshalJSON(t *testing.T) {
 	want := &Packages{
-		Dependencies: map[string][]*build.Package{
-			"do/tools/build/gta": []*build.Package{
+		Dependencies: map[string][]*Package{
+			"do/tools/build/gta": []*Package{
 				{
 					ImportPath: "do/tools/build/gta/cmd/gta",
 				},
@@ -398,12 +398,12 @@ func TestUnmarshalJSON(t *testing.T) {
 				},
 			},
 		},
-		Changes: []*build.Package{
+		Changes: []*Package{
 			{
 				ImportPath: "do/teams/compute/octopus",
 			},
 		},
-		AllChanges: []*build.Package{
+		AllChanges: []*Package{
 			{
 				ImportPath: "do/teams/compute/octopus",
 			},
@@ -425,8 +425,8 @@ func TestUnmarshalJSON(t *testing.T) {
 
 func TestJSONRoundtrip(t *testing.T) {
 	want := &Packages{
-		Dependencies: map[string][]*build.Package{
-			"do/tools/build/gta": []*build.Package{
+		Dependencies: map[string][]*Package{
+			"do/tools/build/gta": []*Package{
 				{
 					ImportPath: "do/tools/build/gta/cmd/gta",
 				},
@@ -435,12 +435,12 @@ func TestJSONRoundtrip(t *testing.T) {
 				},
 			},
 		},
-		Changes: []*build.Package{
+		Changes: []*Package{
 			{
 				ImportPath: "do/teams/compute/octopus",
 			},
 		},
-		AllChanges: []*build.Package{
+		AllChanges: []*Package{
 			{
 				ImportPath: "do/teams/compute/octopus",
 			},

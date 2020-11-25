@@ -101,7 +101,7 @@ func main() {
 	fmt.Println(strings.Join(strung, " "))
 }
 
-func stringify(pkgs []*build.Package, validOnly bool) []string {
+func stringify(pkgs []*gta.Package, validOnly bool) []string {
 	var out []string
 	for _, pkg := range pkgs {
 		if !validOnly || (validOnly && pkg.SrcRoot != "") {
