@@ -29,14 +29,14 @@ var (
 // packages GTA has detected.
 type Packages struct {
 	// Dependencies contains a map of changed packages to their dependencies
-	Dependencies map[string][]*Package
+	Dependencies map[string][]Package
 
 	// Changes represents the changed files
-	Changes []*Package
+	Changes []Package
 
 	// AllChanges represents all packages that are dirty including the initial
 	// changed packages.
-	AllChanges []*Package
+	AllChanges []Package
 }
 
 type packagesJSON struct {
@@ -64,19 +64,19 @@ func (p *Packages) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	p.Dependencies = make(map[string][]*Package)
+	p.Dependencies = make(map[string][]Package)
 	for k, v := range s.Dependencies {
 		for _, vv := range v {
-			p.Dependencies[k] = append(p.Dependencies[k], &Package{ImportPath: vv})
+			p.Dependencies[k] = append(p.Dependencies[k], Package{ImportPath: vv})
 		}
 	}
 
 	for _, v := range s.Changes {
-		p.Changes = append(p.Changes, &Package{ImportPath: v})
+		p.Changes = append(p.Changes, Package{ImportPath: v})
 	}
 
 	for _, v := range s.AllChanges {
-		p.AllChanges = append(p.AllChanges, &Package{ImportPath: v})
+		p.AllChanges = append(p.AllChanges, Package{ImportPath: v})
 	}
 
 	return nil
@@ -136,7 +136,7 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 	}
 
 	cp := &Packages{
-		Dependencies: map[string][]*Package{},
+		Dependencies: map[string][]Package{},
 	}
 
 	packageFromImport := func(path string) (*Package, error) {
@@ -151,9 +151,9 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 	}
 
 	// build our packages
-	allChanges := map[string]*Package{}
+	allChanges := map[string]Package{}
 	for changed, marked := range paths {
-		var packages []*Package
+		var packages []Package
 
 		// add any dependents of the changed package; the changed package will be included in marked.
 		for path, check := range marked {
@@ -168,7 +168,7 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 				pkg = pkg2
 			}
 
-			addPackage := func(pkg *Package) {
+			addPackage := func(pkg Package) {
 				allChanges[pkg.ImportPath] = pkg
 				if changed == pkg.ImportPath {
 					cp.Changes = append(cp.Changes, pkg)
@@ -178,7 +178,7 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 			}
 
 			if hasPrefixIn(pkg.ImportPath, g.prefixes) {
-				addPackage(pkg)
+				addPackage(*pkg)
 			}
 		}
 
@@ -328,13 +328,13 @@ func (g *GTA) findImportPath(abs string) (string, error) {
 	return path.Join(pkg.ImportPath, base), nil
 }
 
-type byPackageImportPath []*Package
+type byPackageImportPath []Package
 
 func (b byPackageImportPath) Len() int               { return len(b) }
 func (b byPackageImportPath) Less(i int, j int) bool { return b[i].ImportPath < b[j].ImportPath }
 func (b byPackageImportPath) Swap(i int, j int)      { b[i], b[j] = b[j], b[i] }
 
-func stringify(pkgs []*Package) []string {
+func stringify(pkgs []Package) []string {
 	var out []string
 	for _, pkg := range pkgs {
 		out = append(out, pkg.ImportPath)
@@ -342,7 +342,7 @@ func stringify(pkgs []*Package) []string {
 	return out
 }
 
-func mapify(pkgs map[string][]*Package) map[string][]string {
+func mapify(pkgs map[string][]Package) map[string][]string {
 	out := map[string][]string{}
 	for key, pkgs := range pkgs {
 		out[key] = stringify(pkgs)
