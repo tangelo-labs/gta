@@ -18,14 +18,14 @@ type Package struct {
 	SrcRoot    string
 }
 
-// GraphError is a collection of errors from attempting to build the
+// graphError is a collection of errors from attempting to build the
 // dependent graph.
-type GraphError struct {
+type graphError struct {
 	Errors map[string]error
 }
 
 // Error implements the error interface for GraphError.
-func (g *GraphError) Error() string {
+func (g *graphError) Error() string {
 	return fmt.Sprintf("errors while generating import graph: %v", g.Errors)
 }
 
@@ -43,41 +43,41 @@ type Packager interface {
 }
 
 // verify DefaultPackager implements the the Packager interface
-var _ Packager = DefaultPackager
+var _ Packager = defaultPackager
 
-// DefaultPackager is the default instance of PackageContext.
-var DefaultPackager = &PackageContext{
+// defaultPackager is the default instance of PackageContext.
+var defaultPackager = &packageContext{
 	ctx: &build.Default,
 }
 
-// PackageContext implements the Packager interface using build contexts.
-type PackageContext struct {
+// packageContext implements the Packager interface using build contexts.
+type packageContext struct {
 	ctx *build.Context
 }
 
 // PackageFromDir returns a build package from a directory.
-func (p *PackageContext) PackageFromDir(dir string) (*Package, error) {
+func (p *packageContext) PackageFromDir(dir string) (*Package, error) {
 	pkg, err := p.ctx.ImportDir(dir, build.ImportComment)
 	return packageFrom(pkg), err
 }
 
 // PackageFromEmptyDir returns a build package from a directory.
-func (p *PackageContext) PackageFromEmptyDir(dir string) (*Package, error) {
+func (p *packageContext) PackageFromEmptyDir(dir string) (*Package, error) {
 	pkg, err := p.ctx.ImportDir(dir, build.FindOnly)
 	return packageFrom(pkg), err
 }
 
 // PackageFromImport returns a build package from an import path.
-func (p *PackageContext) PackageFromImport(importPath string) (*Package, error) {
+func (p *packageContext) PackageFromImport(importPath string) (*Package, error) {
 	pkg, err := p.ctx.Import(importPath, ".", build.ImportComment)
 	return packageFrom(pkg), err
 }
 
 // DependentGraph returns a dependent graph based on the current Go workspace.
-func (p *PackageContext) DependentGraph() (*Graph, error) {
+func (p *packageContext) DependentGraph() (*Graph, error) {
 	_, graph, errs := importgraph.Build(p.ctx)
 	if len(errs) != 0 {
-		return nil, &GraphError{Errors: errs}
+		return nil, &graphError{Errors: errs}
 	}
 
 	return &Graph{graph: graph}, nil

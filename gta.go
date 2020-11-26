@@ -95,7 +95,7 @@ type GTA struct {
 func New(opts ...Option) (*GTA, error) {
 	gta := &GTA{
 		differ:   NewGitDiffer(),
-		packager: DefaultPackager,
+		packager: defaultPackager,
 	}
 
 	for _, opt := range opts {
