@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"go/build"
-	"reflect"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -121,10 +120,8 @@ func TestGTA(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %v", want)
-		t.Errorf(" got: %v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -275,10 +272,8 @@ func TestGTA_Prefix(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %+v", want)
-		t.Errorf(" got: %+v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -313,10 +308,8 @@ func TestNoBuildableGoFiles(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %#v", want)
-		t.Errorf(" got: %#v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -379,10 +372,8 @@ func TestSpecialCaseDirectory(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %v", want)
-		t.Errorf(" got: %v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -418,8 +409,8 @@ func TestUnmarshalJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v; want %v", got, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -458,7 +449,7 @@ func TestJSONRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v; want %v", got, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }

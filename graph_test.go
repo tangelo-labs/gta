@@ -7,8 +7,9 @@ in the LICENSE file.
 package gta
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestGraphTraversal(t *testing.T) {
@@ -85,10 +86,8 @@ func TestGraphTraversal(t *testing.T) {
 		t.Log(tt.comment)
 		got := map[string]bool{}
 		tt.graph.Traverse(tt.start, got)
-		if !reflect.DeepEqual(tt.want, got) {
-			t.Error("expected want and got to be equal")
-			t.Errorf("want: %v", tt.want)
-			t.Errorf(" got: %v", got)
+		if diff := cmp.Diff(tt.want, got); diff != "" {
+			t.Errorf("(-want, +got)\n%s", diff)
 		}
 	}
 }

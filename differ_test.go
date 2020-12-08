@@ -8,8 +8,9 @@ package gta
 
 import (
 	"bytes"
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 // check to make sure Git implements the Differ interface.
@@ -79,9 +80,8 @@ bar/baz/qux/corge.go
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if want, got := tt.want, got; !reflect.DeepEqual(want, got) {
-				t.Fatalf("unexpected file directory map:\n- want: %v\n-  got: %v",
-					want, got)
+			if diff := cmp.Diff(tt.want, got); diff != "" {
+				t.Errorf("(-want, +got)\n%s", diff)
 			}
 		})
 	}
