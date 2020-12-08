@@ -32,3 +32,11 @@ func SetPrefixes(prefixes ...string) Option {
 		return nil
 	}
 }
+
+// SetTags sets a list of build tags to consider.
+func SetTags(tags ...string) Option {
+	return func(g *GTA) error {
+		g.tags = tags
+		return nil
+	}
+}

@@ -587,7 +587,10 @@ func testMain(m *testing.M) error {
 	}
 
 	// This is super jank, but the default packager uses build.Default, so just set GOPATH in it...
+	// TODO(bc): how to deal with this in module aware mode? I suspect we should
+	// use subtests: one with a module and one without.
 	build.Default.GOPATH = wd
+	os.Setenv("GOPATH", wd)
 
 	if i := m.Run(); i != 0 {
 		return errors.New("failed")
