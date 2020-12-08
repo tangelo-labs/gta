@@ -126,89 +126,91 @@ func TestGTA(t *testing.T) {
 }
 
 func TestGTA_ChangedPackages(t *testing.T) {
-	// A depends on B depends on C
-	// D depends on B
-	// E depends on F depends on G
+	t.Run("basic", func(t *testing.T) {
+		// A depends on B depends on C
+		// D depends on B
+		// E depends on F depends on G
 
-	difr := &testDiffer{
-		diff: map[string]Directory{
-			"dirC": Directory{Exists: true},
-			"dirH": Directory{Exists: true},
-		},
-	}
+		difr := &testDiffer{
+			diff: map[string]Directory{
+				"dirC": Directory{Exists: true},
+				"dirH": Directory{Exists: true},
+			},
+		}
 
-	graph := &Graph{
-		graph: map[string]map[string]bool{
-			"C": map[string]bool{
-				"B": true,
+		graph := &Graph{
+			graph: map[string]map[string]bool{
+				"C": map[string]bool{
+					"B": true,
+				},
+				"B": map[string]bool{
+					"A": true,
+					"D": true,
+				},
+				"G": map[string]bool{
+					"F": true,
+				},
+				"F": map[string]bool{
+					"E": true,
+				},
 			},
-			"B": map[string]bool{
-				"A": true,
-				"D": true,
-			},
-			"G": map[string]bool{
-				"F": true,
-			},
-			"F": map[string]bool{
-				"E": true,
-			},
-		},
-	}
+		}
 
-	pkgr := &testPackager{
-		dirs2Imports: map[string]string{
-			"dirA": "A",
-			"dirB": "B",
-			"dirC": "C",
-			"dirD": "D",
-			"dirF": "E",
-			"dirG": "F",
-			"dirH": "G",
-		},
-		graph: graph,
-		errs:  make(map[string]error),
-	}
+		pkgr := &testPackager{
+			dirs2Imports: map[string]string{
+				"dirA": "A",
+				"dirB": "B",
+				"dirC": "C",
+				"dirD": "D",
+				"dirF": "E",
+				"dirG": "F",
+				"dirH": "G",
+			},
+			graph: graph,
+			errs:  make(map[string]error),
+		}
 
-	want := &Packages{
-		Dependencies: map[string][]Package{
-			"C": []Package{
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"C": []Package{
+					{ImportPath: "A"},
+					{ImportPath: "B"},
+					{ImportPath: "D"},
+				},
+				"G": []Package{
+					{ImportPath: "E"},
+					{ImportPath: "F"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "C"},
+				{ImportPath: "G"},
+			},
+			AllChanges: []Package{
 				{ImportPath: "A"},
 				{ImportPath: "B"},
+				{ImportPath: "C"},
 				{ImportPath: "D"},
-			},
-			"G": []Package{
 				{ImportPath: "E"},
 				{ImportPath: "F"},
+				{ImportPath: "G"},
 			},
-		},
-		Changes: []Package{
-			{ImportPath: "C"},
-			{ImportPath: "G"},
-		},
-		AllChanges: []Package{
-			{ImportPath: "A"},
-			{ImportPath: "B"},
-			{ImportPath: "C"},
-			{ImportPath: "D"},
-			{ImportPath: "E"},
-			{ImportPath: "F"},
-			{ImportPath: "G"},
-		},
-	}
+		}
 
-	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
-	if err != nil {
-		t.Fatal(err)
-	}
+		gta, err := New(SetDiffer(difr), SetPackager(pkgr))
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	got, err := gta.ChangedPackages()
-	if err != nil {
-		t.Fatal(err)
-	}
+		got, err := gta.ChangedPackages()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if diff := cmp.Diff(got, want); diff != "" {
-		t.Errorf("(-want, +got)\n%s", diff)
-	}
+		if diff := cmp.Diff(got, want); diff != "" {
+			t.Errorf("(-want, +got)\n%s", diff)
+		}
+	})
 }
 
 func TestGTA_Prefix(t *testing.T) {
