@@ -18,7 +18,12 @@ import (
 
 type Package struct {
 	ImportPath string
-	Dir        string
+
+	// Dir the absolute path of the directory containing the package.
+	// bug(bc): this is currently unreliable and in GOPATH mode only identifies
+	// the src directory for the GOPATH that hosts the package.  Currently, the
+	// only guarantee is that Dir will not be empty when the package exists.
+	Dir string
 }
 
 // graphError is a collection of errors from attempting to build the
@@ -48,13 +53,34 @@ type Packager interface {
 }
 
 func NewPackager(prefixes, tags []string) Packager {
-	importPathsByDir, g, err := dependencyGraph(prefixes, tags)
+	return newPackager(newLoadConfig(tags), prefixes)
+}
+
+func newPackager(cfg *packages.Config, prefixes []string) Packager {
+	importPathsByDir, g, err := dependencyGraph(cfg, prefixes)
+	ctx := build.Default
 	return &packageContext{
-		ctx:              &build.Default,
+		ctx:              &ctx,
 		err:              err,
 		packages:         make(map[string]struct{}),
 		reverse:          g,
 		importPathsByDir: importPathsByDir,
+	}
+}
+
+// newLoadConfig returns a *packages.Config suitable for use by packages.Load.
+// The constructor here is mostly useful for tests.
+func newLoadConfig(tags []string) *packages.Config {
+	return &packages.Config{
+		Mode: packages.NeedName |
+			packages.NeedFiles |
+			packages.NeedImports |
+			packages.NeedDeps |
+			packages.NeedModule,
+		BuildFlags: []string{
+			fmt.Sprintf(`-tags=%s`, strings.Join(tags, ",")),
+		},
+		Tests: true,
 	}
 }
 
@@ -68,6 +94,8 @@ type packageContext struct {
 	reverse map[string]map[string]struct{}
 	// importPathsByDir is a map of directories to import paths. absolute path directory -> import path
 	importPathsByDir map[string]string
+
+	packagesConfig *packages.Config
 }
 
 // PackageFromDir returns a build package from a directory.
@@ -161,19 +189,7 @@ func resolveLocal(pkg *Package, dir string, importPathsByDir map[string]string) 
 // dependencyGraph constructs a map of directories to import paths when in
 // module aware mode and flattened reverse transitive dependency graph. When in
 // GOPATH mode the map of directories to import paths will be empty.
-func dependencyGraph(includePkgs, tags []string) (map[string]string, map[string]map[string]struct{}, error) {
-	cfg := &packages.Config{
-		Mode: packages.NeedName |
-			packages.NeedFiles |
-			packages.NeedImports |
-			packages.NeedDeps |
-			packages.NeedModule,
-		BuildFlags: []string{
-			fmt.Sprintf(`-tags=%s`, strings.Join(tags, ",")),
-		},
-		Tests: true,
-	}
-
+func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]string, map[string]map[string]struct{}, error) {
 	pkgs := make([]string, 0, len(includePkgs))
 	for _, pkg := range includePkgs {
 		pkgs = append(pkgs, fmt.Sprintf("%s...", pkg))
@@ -228,8 +244,6 @@ func dependencyGraph(includePkgs, tags []string) (map[string]string, map[string]
 			m := reverse[importedPath]
 			m[pkgPath] = struct{}{}
 		}
-
-		return
 	}
 
 	for _, pkg := range loadedPackages {

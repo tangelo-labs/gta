@@ -105,6 +105,9 @@ func New(opts ...Option) (*GTA, error) {
 		}
 	}
 
+	// set the default packager after applying option so that the default
+	// packager implementation does not load packages unnecessarily when the
+	// packager is provided as an option.
 	if gta.packager == nil {
 		gta.packager = NewPackager(gta.prefixes, gta.tags)
 	}
