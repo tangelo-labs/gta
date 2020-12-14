@@ -49,7 +49,7 @@ func main() {
 
 	options := []gta.Option{
 		gta.SetPrefixes(parseStringSlice(*flagInclude)...),
-		gta.SetTags(strings.Split(*flagTags, ",")...),
+		gta.SetTags(parseStringSlice(*flagTags)...),
 	}
 
 	if len(*flagChangedFiles) == 0 {
