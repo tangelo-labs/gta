@@ -60,11 +60,11 @@ func newPackager(cfg *packages.Config, prefixes []string) Packager {
 	importPathsByDir, g, err := dependencyGraph(cfg, prefixes)
 	ctx := build.Default
 	return &packageContext{
-		ctx:              &ctx,
-		err:              err,
-		packages:         make(map[string]struct{}),
-		reverse:          g,
-		importPathsByDir: importPathsByDir,
+		ctx:               &ctx,
+		err:               err,
+		packages:          make(map[string]struct{}),
+		reverse:           g,
+		modulesNamesByDir: importPathsByDir,
 	}
 }
 
@@ -92,8 +92,8 @@ type packageContext struct {
 	packages map[string]struct{}
 	// reverse is a reverse dependency graph (import path -> (dependent import path -> struct{}{}))
 	reverse map[string]map[string]struct{}
-	// importPathsByDir is a map of directories to import paths. absolute path directory -> import path
-	importPathsByDir map[string]string
+	// modulesNamesByDir is a map of directories to import paths. absolute path directory -> import path/module name
+	modulesNamesByDir map[string]string
 
 	packagesConfig *packages.Config
 }
@@ -104,7 +104,7 @@ func (p *packageContext) PackageFromDir(dir string) (*Package, error) {
 	// (e.g. build.NoGoError) will be returned.
 	pkg, err := p.ctx.ImportDir(dir, build.ImportComment)
 	pkg2 := packageFrom(pkg)
-	resolveLocal(pkg2, dir, p.importPathsByDir)
+	resolveLocal(pkg2, dir, p.modulesNamesByDir)
 	p.packages[pkg2.ImportPath] = struct{}{}
 	return pkg2, err
 }
@@ -114,7 +114,7 @@ func (p *packageContext) PackageFromEmptyDir(dir string) (*Package, error) {
 	// TODO(bc): construct the Package from the information about the module or GOPATH
 	pkg, err := p.ctx.ImportDir(dir, build.FindOnly)
 	pkg2 := packageFrom(pkg)
-	resolveLocal(pkg2, dir, p.importPathsByDir)
+	resolveLocal(pkg2, dir, p.modulesNamesByDir)
 	p.packages[pkg2.ImportPath] = struct{}{}
 	return pkg2, err
 }
@@ -154,32 +154,40 @@ func packageFrom(pkg *build.Package) *Package {
 
 // resolveLocal resolves pkg.ImportPath and pkg.SrcRoot for dir against
 // importPathsByDir when pkg.ImportPath is a relative path.
-func resolveLocal(pkg *Package, dir string, importPathsByDir map[string]string) {
+func resolveLocal(pkg *Package, dir string, modulesByDir map[string]string) {
 	if pkg.ImportPath != "." {
 		return
 	}
 
 	importPath := pkg.ImportPath
 
-	for k, v := range importPathsByDir {
+	var mruPrefix string
+	for k, v := range modulesByDir {
 		// check for an exact match
 		if dir == k {
 			importPath = v
 			break
 		}
 
-		if strings.HasPrefix(dir, k) {
-			vendorPathSegment := "/vendor/"
-			candidateImportPath := strings.ReplaceAll(strings.TrimPrefix(dir, k), string(filepath.Separator), "/")
-			if strings.HasPrefix(candidateImportPath, vendorPathSegment) {
-				candidateImportPath = strings.TrimPrefix(candidateImportPath, vendorPathSegment)
-			} else {
-				candidateImportPath = path.Join(v, candidateImportPath)
-			}
+		// there may be nested modules; make sure the directory being checked is
+		// within the directory for current entry and deeper than the most recently
+		// matched prefix.
+		if !strings.HasPrefix(dir, k) || len(mruPrefix) > len(k) {
+			continue
+		}
 
-			if len(candidateImportPath) > len(importPath) {
-				importPath = candidateImportPath
-			}
+		mruPrefix = k
+
+		vendorPathSegment := "/vendor/"
+		candidateImportPath := strings.ReplaceAll(strings.TrimPrefix(dir, k), string(filepath.Separator), "/")
+
+		// vendored packages within modules should not have a `vendor` prefix and
+		// will not have one in the value returned from packages.Load, so strip
+		// it out.
+		if strings.HasPrefix(candidateImportPath, vendorPathSegment) {
+			importPath = strings.TrimPrefix(candidateImportPath, vendorPathSegment)
+		} else {
+			importPath = path.Join(v, candidateImportPath)
 		}
 	}
 
