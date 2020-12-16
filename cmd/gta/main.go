@@ -47,9 +47,14 @@ func main() {
 		log.Fatal("changed files must not be provided when using the latest merge commit")
 	}
 
+	var tags []string
+	for _, v := range parseStringSlice(*flagTags) {
+		tags = append(tags, strings.Fields(v)...)
+	}
+
 	options := []gta.Option{
 		gta.SetPrefixes(parseStringSlice(*flagInclude)...),
-		gta.SetTags(parseStringSlice(*flagTags)...),
+		gta.SetTags(tags...),
 	}
 
 	if len(*flagChangedFiles) == 0 {
