@@ -222,10 +222,6 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 			importPathsByDir[pkg.Module.Dir] = pkg.Module.Path
 		}
 
-		// normalize the import path so that test packages will be flattened into
-		// the package path of the primary package.
-		pkgPath := normalizeImportPath(pkg.PkgPath)
-
 		seen[pkg.ID] = struct{}{}
 
 		// Ignore packages that do not have any Go files that satisfy the build
@@ -234,10 +230,19 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 			return
 		}
 
+		// Ignore the test binary packages
+		if filepath.Ext(pkg.GoFiles[0]) != ".go" && strings.HasSuffix(pkg.PkgPath, ".test") {
+			return
+		}
+
+		// normalize the import path so that test packages will be flattened into
+		// the package path of the primary package.
+		pkgPath := normalizeImportPath(pkg)
+
 		for _, importedPkg := range pkg.Imports {
 			addPackage(importedPkg)
 
-			importedPath := normalizeImportPath(importedPkg.PkgPath)
+			importedPath := normalizeImportPath(importedPkg)
 
 			// do not attempt to add the normalized import path to the dependent
 			// graph when the normalized import path is the same as the package whose
@@ -261,14 +266,27 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 	return importPathsByDir, reverse, nil
 }
 
-func normalizeImportPath(pkg string) string {
-	switch {
-	case strings.HasSuffix(pkg, "_test"):
-		pkg = strings.TrimSuffix(pkg, "_test")
-	case strings.HasSuffix(pkg, ".test"):
-		pkg = strings.TrimSuffix(pkg, ".test")
-	case strings.HasSuffix(pkg, ".test]"):
-		pkg = strings.Fields(pkg)[0]
+// normalizeImportPath will return the import path of pkg. The import path may
+// not be pkg.PkgPath (e.g. when pkg is a package for external tests, the final
+// segment of pkg.PkgPath will differ from the import path of the package in
+// pkg's directory).
+func normalizeImportPath(pkg *packages.Package) string {
+	files := pkg.GoFiles
+
+	importPath := pkg.PkgPath
+	if len(files) == 0 || !(strings.HasSuffix(importPath, "_test") || strings.HasSuffix(importPath, ".test")) {
+		return importPath
 	}
-	return pkg
+
+	ext := filepath.Ext(files[0])
+	if ext != ".go" {
+		return importPath
+	}
+
+	dirBase := filepath.Base(filepath.Dir(files[0]))
+	importPathBase := path.Base(importPath)
+	if importPathBase != dirBase {
+		importPath = path.Join(path.Dir(importPath), dirBase)
+	}
+	return importPath
 }

@@ -511,6 +511,54 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		testChangedPackages(t, diff, nil, want)
 	})
+	t.Run("change external", func(t *testing.T) {
+		diff := map[string]Directory{
+			"foo": {Exists: true, Files: []string{"foo_test.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"foo": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+	t.Run("change badly named package", func(t *testing.T) {
+		diff := map[string]Directory{
+			"bar_test": {Exists: true, Files: []string{"util.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"bar_test": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "bar_test", Dir: "bar_test"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "bar_test", Dir: "bar_test"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
 }
 
 func TestGTA_Prefix(t *testing.T) {
