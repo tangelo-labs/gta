@@ -9,11 +9,16 @@ package gta
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"go/build"
-	"reflect"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"golang.org/x/tools/go/packages/packagestest"
 )
 
 var _ Differ = &testDiffer{}
@@ -121,97 +126,439 @@ func TestGTA(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %v", want)
-		t.Errorf(" got: %v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
 func TestGTA_ChangedPackages(t *testing.T) {
-	// A depends on B depends on C
-	// D depends on B
-	// E depends on F depends on G
+	t.Run("basic", func(t *testing.T) {
+		// A depends on B depends on C
+		// D depends on B
+		// E depends on F depends on G
 
-	difr := &testDiffer{
-		diff: map[string]Directory{
-			"dirC": Directory{Exists: true},
-			"dirH": Directory{Exists: true},
-		},
-	}
+		difr := &testDiffer{
+			diff: map[string]Directory{
+				"dirC": Directory{Exists: true},
+				"dirH": Directory{Exists: true},
+			},
+		}
 
-	graph := &Graph{
-		graph: map[string]map[string]bool{
-			"C": map[string]bool{
-				"B": true,
+		graph := &Graph{
+			graph: map[string]map[string]bool{
+				"C": map[string]bool{
+					"B": true,
+				},
+				"B": map[string]bool{
+					"A": true,
+					"D": true,
+				},
+				"G": map[string]bool{
+					"F": true,
+				},
+				"F": map[string]bool{
+					"E": true,
+				},
 			},
-			"B": map[string]bool{
-				"A": true,
-				"D": true,
-			},
-			"G": map[string]bool{
-				"F": true,
-			},
-			"F": map[string]bool{
-				"E": true,
-			},
-		},
-	}
+		}
 
-	pkgr := &testPackager{
-		dirs2Imports: map[string]string{
-			"dirA": "A",
-			"dirB": "B",
-			"dirC": "C",
-			"dirD": "D",
-			"dirF": "E",
-			"dirG": "F",
-			"dirH": "G",
-		},
-		graph: graph,
-		errs:  make(map[string]error),
-	}
+		pkgr := &testPackager{
+			dirs2Imports: map[string]string{
+				"dirA": "A",
+				"dirB": "B",
+				"dirC": "C",
+				"dirD": "D",
+				"dirF": "E",
+				"dirG": "F",
+				"dirH": "G",
+			},
+			graph: graph,
+			errs:  make(map[string]error),
+		}
 
-	want := &Packages{
-		Dependencies: map[string][]Package{
-			"C": []Package{
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"C": []Package{
+					{ImportPath: "A"},
+					{ImportPath: "B"},
+					{ImportPath: "D"},
+				},
+				"G": []Package{
+					{ImportPath: "E"},
+					{ImportPath: "F"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "C"},
+				{ImportPath: "G"},
+			},
+			AllChanges: []Package{
 				{ImportPath: "A"},
 				{ImportPath: "B"},
+				{ImportPath: "C"},
 				{ImportPath: "D"},
-			},
-			"G": []Package{
 				{ImportPath: "E"},
 				{ImportPath: "F"},
+				{ImportPath: "G"},
 			},
-		},
-		Changes: []Package{
-			{ImportPath: "C"},
-			{ImportPath: "G"},
-		},
-		AllChanges: []Package{
-			{ImportPath: "A"},
-			{ImportPath: "B"},
-			{ImportPath: "C"},
-			{ImportPath: "D"},
-			{ImportPath: "E"},
-			{ImportPath: "F"},
-			{ImportPath: "G"},
-		},
+		}
+
+		gta, err := New(SetDiffer(difr), SetPackager(pkgr))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got, err := gta.ChangedPackages()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, want); diff != "" {
+			t.Errorf("(-want, +got)\n%s", diff)
+		}
+	})
+
+	const testModule string = "gta.test"
+	// testChangedPackages executes ChangedPackages for each of the exporters and
+	// makes sure the return values match expectations. diff is a map of
+	// directory name fragments (i.e a relative directory sans ./) to Directory
+	// values that will be expanded and provided provided as a differ via
+	// testDiffer. shouldRemoveFile is a function that returns a boolean value
+	// indicating whether a file identified by a filename fragment should be
+	// deleted. want is the expected value from ChangedPackages().
+	testChangedPackages := func(t *testing.T, diff map[string]Directory, shouldRemoveFile func(string) bool, want *Packages) {
+		t.Helper()
+
+		packagestest.TestAll(t, func(t *testing.T, exporter packagestest.Exporter) {
+			t.Helper()
+
+			e := packagestest.Export(t, exporter, []packagestest.Module{
+				{
+					Name:  testModule,
+					Files: packagestest.MustCopyFileTree(filepath.Join("testdata", "gtatest")),
+				},
+			})
+
+			t.Cleanup(e.Cleanup)
+
+			// create a new map from diff
+			m := make(map[string]Directory)
+			for k, v := range diff {
+				// expand keys to the absolute path
+				m[exporter.Filename(e, testModule, k)] = v
+
+				// delete v if the diff says it shouldn't exist.
+				if !v.Exists {
+					err := os.RemoveAll(exporter.Filename(e, testModule, k))
+					if err != nil {
+						t.Fatal(fmt.Errorf("could not remove %s: %w", k, err))
+					}
+				} else {
+					if shouldRemoveFile != nil {
+						for _, file := range v.Files {
+							fragment := path.Join(k, file)
+							if !shouldRemoveFile(fragment) {
+								continue
+							}
+							err := os.Remove(exporter.Filename(e, testModule, fragment))
+							if err != nil {
+								t.Fatal(fmt.Errorf("could not remove %s: %w", fragment, err))
+							}
+						}
+					}
+				}
+			}
+			difr := &testDiffer{
+				diff: m,
+			}
+
+			qualifyPackages := func(pkgs []Package) []Package {
+				qualified := make([]Package, len(pkgs))
+				for i, pkg := range pkgs {
+					pkg.ImportPath = fmt.Sprintf("%s/%s", testModule, pkg.ImportPath)
+					// deleted packages should have an empty Dir value and should not be
+					// expanded.
+					if pkg.Dir != "" {
+						pkg.Dir = exporter.Filename(e, testModule, pkg.Dir)
+					}
+					qualified[i] = pkg
+				}
+
+				return qualified
+			}
+
+			deps := make(map[string][]Package)
+			for k, v := range want.Dependencies {
+				v = qualifyPackages(v)
+				deps[fmt.Sprintf("%s/%s", testModule, k)] = v
+			}
+
+			qualifiedWant := new(Packages)
+			qualifiedWant.Dependencies = deps
+			qualifiedWant.Changes = qualifyPackages(want.Changes)
+			qualifiedWant.AllChanges = qualifyPackages(want.AllChanges)
+
+			popd := chdir(t, exporter.Filename(e, testModule, ""))
+			t.Cleanup(popd)
+
+			cfg := newLoadConfig(nil)
+			e.Config.Mode = cfg.Mode
+			e.Config.BuildFlags = cfg.BuildFlags
+			e.Config.Tests = cfg.Tests
+
+			// the default build.Context uses GOPATH as its set at initialization and
+			// it must be overridden for each test.
+			for _, v := range e.Config.Env {
+				sl := strings.SplitN(v, "=", 2)
+				if sl[0] != "GOPATH" {
+					continue
+				}
+
+				// reset the default build.Context's value after the test completes.
+				defer func(v string) {
+					build.Default.GOPATH = v
+				}(build.Default.GOPATH)
+
+				build.Default.GOPATH = sl[1]
+			}
+			defer AllSetenv(t, e.Config.Env)()
+
+			sut, err := New(SetDiffer(difr), SetPackager(newPackager(e.Config, []string{testModule + "/"})))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			got, err := sut.ChangedPackages()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			packagesEqual := func(pkg1, pkg2 Package) bool {
+				return pkg1.ImportPath == pkg2.ImportPath && (len(pkg1.Dir) == 0) == (len(pkg2.Dir) == 0)
+			}
+			if diff := cmp.Diff(qualifiedWant, got, cmp.Comparer(packagesEqual)); diff != "" {
+				t.Errorf("(-want, +got)\n%s", diff)
+			}
+		})
 	}
 
-	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
-	if err != nil {
-		t.Fatal(err)
+	// alwaysRemove is a convenience function to pass to testChangedPackages to
+	// cause every file in the diff to be removed from disk.
+	alwaysRemove := func(_ string) bool {
+		// delete all the go files in diff.
+		return true
 	}
+	t.Run("proper deletion", func(t *testing.T) {
+		// TODO(bc): figure out how to delete the files
+		t.Run("go files only", func(t *testing.T) {
+			diff := map[string]Directory{
+				"gofilesdeleted":       {Exists: true, Files: []string{"gofilesdeleted.go"}},
+				"gofilesdeletedclient": {Exists: true, Files: []string{"gofilesdeletedclient.go"}},
+			}
 
-	got, err := gta.ChangedPackages()
-	if err != nil {
-		t.Fatal(err)
-	}
+			want := &Packages{
+				Dependencies: map[string][]Package{},
+				Changes: []Package{
+					{ImportPath: "gofilesdeleted"},
+					{ImportPath: "gofilesdeletedclient"},
+				},
+				AllChanges: []Package{
+					{ImportPath: "gofilesdeleted"},
+					{ImportPath: "gofilesdeletedclient"},
+				},
+			}
 
-	if diff := cmp.Diff(got, want); diff != "" {
-		t.Errorf("(-want, +got)\n%s", diff)
-	}
+			shouldDelete := func(fragment string) bool {
+				// delete all the go files in diff.
+				return true
+			}
+
+			testChangedPackages(t, diff, shouldDelete, want)
+		})
+
+		t.Run("directory", func(t *testing.T) {
+			diff := map[string]Directory{
+				"deleted":       {Exists: false, Files: []string{"deleted.go"}},
+				"deletedclient": {Exists: false, Files: []string{"deletedclient.go"}},
+			}
+
+			want := &Packages{
+				Dependencies: map[string][]Package{},
+				Changes: []Package{
+					{ImportPath: "deleted"},
+					{ImportPath: "deletedclient"},
+				},
+				AllChanges: []Package{
+					{ImportPath: "deleted"},
+					{ImportPath: "deletedclient"},
+				},
+			}
+
+			testChangedPackages(t, diff, nil, want)
+		})
+	})
+
+	t.Run("partial deletion", func(t *testing.T) {
+		t.Run("go files only", func(t *testing.T) {
+			diff := map[string]Directory{
+				"gofilesdeleted": {Exists: true, Files: []string{"gofilesdeleted.go"}},
+			}
+
+			want := &Packages{
+				Dependencies: map[string][]Package{
+					"gofilesdeleted": {
+						{ImportPath: "gofilesdeletedclient", Dir: "gofilesdeletedclient"},
+					},
+				},
+				Changes: []Package{
+					{ImportPath: "gofilesdeleted"},
+				},
+				AllChanges: []Package{
+					{ImportPath: "gofilesdeleted"},
+					{ImportPath: "gofilesdeletedclient", Dir: "gofilesdeletedclient"},
+				},
+			}
+
+			testChangedPackages(t, diff, alwaysRemove, want)
+		})
+
+		t.Run("directory", func(t *testing.T) {
+			diff := map[string]Directory{
+				"deleted": {Exists: false, Files: []string{"deleted.go"}},
+			}
+
+			want := &Packages{
+				Dependencies: map[string][]Package{
+					"deleted": {
+						{ImportPath: "deletedclient", Dir: "deletedClient"},
+					},
+				},
+				Changes: []Package{
+					{ImportPath: "deleted"},
+				},
+				AllChanges: []Package{
+					{ImportPath: "deleted"},
+					{ImportPath: "deletedclient", Dir: "deletedclient"},
+				},
+			}
+
+			testChangedPackages(t, diff, nil, want)
+		})
+	})
+
+	t.Run("change dependency", func(t *testing.T) {
+		diff := map[string]Directory{
+			"foo": {Exists: true, Files: []string{"foo.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"foo": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+		testChangedPackages(t, diff, nil, want)
+	})
+
+	t.Run("change transitive dependency", func(t *testing.T) {
+		diff := map[string]Directory{
+			"foo": {Exists: true, Files: []string{"foo.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"foo": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+	t.Run("change no dependency", func(t *testing.T) {
+		diff := map[string]Directory{
+			"unimported": {Exists: true, Files: []string{"unimported.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{},
+			Changes: []Package{
+				{ImportPath: "unimported", Dir: "unimported"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "unimported", Dir: "unimported"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+	t.Run("change external", func(t *testing.T) {
+		diff := map[string]Directory{
+			"foo": {Exists: true, Files: []string{"foo_test.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"foo": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+	t.Run("change badly named package", func(t *testing.T) {
+		diff := map[string]Directory{
+			"bar_test": {Exists: true, Files: []string{"util.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"bar_test": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "bar_test", Dir: "bar_test"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "bar_test", Dir: "bar_test"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
 }
 
 func TestGTA_Prefix(t *testing.T) {
@@ -275,10 +622,8 @@ func TestGTA_Prefix(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %+v", want)
-		t.Errorf(" got: %+v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -313,10 +658,8 @@ func TestNoBuildableGoFiles(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %#v", want)
-		t.Errorf(" got: %#v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -379,10 +722,8 @@ func TestSpecialCaseDirectory(t *testing.T) {
 
 	got := pkgs.AllChanges
 
-	if !reflect.DeepEqual(want, got) {
-		t.Errorf("want: %v", want)
-		t.Errorf(" got: %v", got)
-		t.Fatal("expected want and got to be equal")
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -418,8 +759,8 @@ func TestUnmarshalJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v; want %v", got, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
 
@@ -458,7 +799,7 @@ func TestJSONRoundtrip(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v; want %v", got, want)
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }

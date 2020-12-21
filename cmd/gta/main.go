@@ -15,7 +15,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"go/build"
 	"io/ioutil"
 	"log"
 	"os"
@@ -26,13 +25,7 @@ import (
 	"github.com/digitalocean/gta"
 
 	"golang.org/x/crypto/ssh/terminal"
-	"golang.org/x/tools/go/buildutil"
 )
-
-// We define this so the tooling works with build tags
-func init() {
-	flag.Var((*buildutil.TagsFlag)(&build.Default.BuildTags), "tags", buildutil.TagsFlagDoc)
-}
 
 func main() {
 	log.SetFlags(log.Lshortfile | log.Ltime)
@@ -42,6 +35,8 @@ func main() {
 	flagJSON := flag.Bool("json", false, "output list of changes as json")
 	flagBuildableOnly := flag.Bool("buildable-only", true, "keep buildable changed packages only")
 	flagChangedFiles := flag.String("changed-files", "", "path to a file containing a newline separated list of files that have changed")
+	flagTags := flag.String("tags", "", "a list of build tags to consider")
+
 	flag.Parse()
 
 	if *flagJSON && *flagBuildableOnly {
@@ -52,8 +47,14 @@ func main() {
 		log.Fatal("changed files must not be provided when using the latest merge commit")
 	}
 
+	var tags []string
+	for _, v := range parseStringSlice(*flagTags) {
+		tags = append(tags, strings.Fields(v)...)
+	}
+
 	options := []gta.Option{
-		gta.SetPrefixes(strings.Split(*flagInclude, ",")...),
+		gta.SetPrefixes(parseStringSlice(*flagInclude)...),
+		gta.SetTags(tags...),
 	}
 
 	if len(*flagChangedFiles) == 0 {
@@ -104,7 +105,7 @@ func main() {
 func stringify(pkgs []gta.Package, validOnly bool) []string {
 	var out []string
 	for _, pkg := range pkgs {
-		if !validOnly || (validOnly && pkg.SrcRoot != "") {
+		if !validOnly || (validOnly && pkg.Dir != "") {
 			out = append(out, pkg.ImportPath)
 		}
 	}
@@ -140,4 +141,16 @@ func keepChangedFile(s string) bool {
 	s = strings.TrimSpace(s)
 
 	return len(s) > 0
+}
+
+func parseStringSlice(s string) []string {
+	var values []string
+	for _, s := range strings.Split(s, ",") {
+		v := strings.TrimSpace(s)
+		if v == "" {
+			continue
+		}
+		values = append(values, v)
+	}
+	return values
 }

@@ -88,14 +88,14 @@ type GTA struct {
 	differ   Differ
 	packager Packager
 	prefixes []string
+	tags     []string
 }
 
 // New returns a new GTA with various options passed to New. Options will be
 // applied in order so that later options can override earlier options.
 func New(opts ...Option) (*GTA, error) {
 	gta := &GTA{
-		differ:   NewGitDiffer(),
-		packager: defaultPackager,
+		differ: NewGitDiffer(),
 	}
 
 	for _, opt := range opts {
@@ -105,12 +105,19 @@ func New(opts ...Option) (*GTA, error) {
 		}
 	}
 
+	// set the default packager after applying option so that the default
+	// packager implementation does not load packages unnecessarily when the
+	// packager is provided as an option.
+	if gta.packager == nil {
+		gta.packager = NewPackager(gta.prefixes, gta.tags)
+	}
+
 	return gta, nil
 }
 
 // ChangedPackages uses the differ and packager to build a map of changed root
 // packages to their dependent packages where dependent is defined as "changed"
-// as well due their dependency to the changed packages. It returns the
+// as well due to their dependency to the changed packages. It returns the
 // dependency graph, the changes differ detected and a set of all unique
 // packages (including the changes).
 //
@@ -197,6 +204,12 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 	return cp, nil
 }
 
+// markedPackages returns a map of maps. The outer map's key is the import path
+// of a package that was changed according to g.differ. The inner maps' (i.e.
+// the values of the outer map) keys are import paths of the dependents of the
+// packages in respective key of the outer map. The inner maps' boolean values
+// are true when the respective package exists and false when the respective
+// package was deleted.
 func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 	if g.differ == nil {
 		return nil, ErrNoDiffer
@@ -215,6 +228,10 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 	// value is true when the package was deleted.
 	changed := make(map[string]bool)
 	for abs, dir := range dirs {
+		// TODO(bc): handle changes to go.mod when vendoring is not being used.
+
+		// ignore deleted directories that contained no go files.
+		// TODO(bc): make sure it was not within a testdata directory.
 		if !dir.Exists && !hasGoFile(dir.Files) {
 			continue
 		}
@@ -224,6 +241,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		// Above link is not guaranteed to work.
 		base := filepath.Base(abs)
 		parent := filepath.Base(filepath.Dir(abs))
+		// TODO(bc): do not ignore testdata directories - use their parent instead.
 		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" || parent == "testdata" {
 			continue
 		}
@@ -261,7 +279,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 			return nil, fmt.Errorf("pulling package information for %q, %v", abs, err)
 		}
 
-		// we create a simple set of changed pkgs by import path
+		// create a simple set of changed pkgs by import path
 		changed[pkg.ImportPath] = false
 	}
 
