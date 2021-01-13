@@ -40,7 +40,7 @@ tests to run in larger `monorepo` style repositories.
 `gta` works by implementing a various set of interfaces, namely the `Differ` and `Packager` interfaces.
 
 Note: When using this tool, it is common to hit the maximum number of open file descriptors limit set by your OS.
-On macOS, this may be a measily 256. Consider raising that maximum to something reasonable with:
+On macOS, this may be a measly 256. Consider raising that maximum to something reasonable with:
 
 ```
 sudo ulimit -n 4096
