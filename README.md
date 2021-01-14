@@ -4,7 +4,7 @@
 
 `gta` is an application which finds Go packages that have deviated from their upstream
 source in git. A typical situation is when a project is using a
-[monorepo](https://www.digitalocean.com/company/blog/taming-your-go-dependencies/).
+[monorepo](https://www.digitalocean.com/blog/taming-your-go-dependencies/).
 At build or continuous integration time, you won't have to build every single package
 since you will know which packages (and dependencies) have changed.
 
