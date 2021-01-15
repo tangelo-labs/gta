@@ -53,12 +53,12 @@ type Packager interface {
 }
 
 func NewPackager(prefixes, tags []string) Packager {
-	return newPackager(newLoadConfig(tags), prefixes)
+	build.Default.BuildTags = tags
+	return newPackager(newLoadConfig(tags), build.Default, prefixes)
 }
 
-func newPackager(cfg *packages.Config, prefixes []string) Packager {
+func newPackager(cfg *packages.Config, ctx build.Context, prefixes []string) Packager {
 	importPathsByDir, g, err := dependencyGraph(cfg, prefixes)
-	ctx := build.Default
 	return &packageContext{
 		ctx:               &ctx,
 		err:               err,

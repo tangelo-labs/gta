@@ -323,7 +323,7 @@ func TestGTA_ChangedPackages(t *testing.T) {
 			}
 			defer AllSetenv(t, e.Config.Env)()
 
-			sut, err := New(SetDiffer(difr), SetPackager(newPackager(e.Config, []string{testModule + "/"})))
+			sut, err := New(SetDiffer(difr), SetPackager(newPackager(e.Config, build.Default, []string{testModule + "/"})))
 			if err != nil {
 				t.Fatal(err)
 			}
