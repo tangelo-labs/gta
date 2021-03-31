@@ -121,6 +121,7 @@ func (p *packageContext) PackageFromEmptyDir(dir string) (*Package, error) {
 
 // PackageFromImport returns a build package from an import path.
 func (p *packageContext) PackageFromImport(importPath string) (*Package, error) {
+	importPath = stripVendor(importPath)
 	pkg, err := p.ctx.Import(importPath, ".", build.ImportComment)
 	pkg2 := packageFrom(pkg)
 	p.packages[pkg2.ImportPath] = struct{}{}
@@ -288,5 +289,15 @@ func normalizeImportPath(pkg *packages.Package) string {
 	if importPathBase != dirBase {
 		importPath = path.Join(path.Dir(importPath), dirBase)
 	}
+	return importPath
+}
+
+func stripVendor(importPath string) string {
+	segment := "/vendor/"
+	idx := strings.Index(importPath, segment)
+	if idx > -1 {
+		importPath = importPath[idx+len(segment):]
+	}
+
 	return importPath
 }
