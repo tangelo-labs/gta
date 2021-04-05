@@ -9,6 +9,7 @@ package gta
 import (
 	"fmt"
 	"go/build"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -293,6 +294,10 @@ func normalizeImportPath(pkg *packages.Package) string {
 }
 
 func stripVendor(importPath string) string {
+	if os.Getenv("GO111MODULE") == "off" {
+		return importPath
+	}
+
 	segment := "/vendor/"
 	idx := strings.Index(importPath, segment)
 	if idx > -1 {
