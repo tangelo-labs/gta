@@ -59,13 +59,14 @@ func NewPackager(prefixes, tags []string) Packager {
 }
 
 func newPackager(cfg *packages.Config, ctx build.Context, prefixes []string) Packager {
-	importPathsByDir, g, err := dependencyGraph(cfg, prefixes)
+	moduleNamesByDir, forward, reverse, err := dependencyGraph(cfg, prefixes)
 	return &packageContext{
 		ctx:               &ctx,
 		err:               err,
 		packages:          make(map[string]struct{}),
-		reverse:           g,
-		modulesNamesByDir: importPathsByDir,
+		forward:           forward,
+		reverse:           reverse,
+		modulesNamesByDir: moduleNamesByDir,
 	}
 }
 
@@ -91,6 +92,8 @@ type packageContext struct {
 	err error
 	// packages is a set of import paths of packages that have been imported.
 	packages map[string]struct{}
+	// forward is a dependency graph (import path -> (dependency import path -> struct{}{}))
+	forward map[string]map[string]struct{}
 	// reverse is a reverse dependency graph (import path -> (dependent import path -> struct{}{}))
 	reverse map[string]map[string]struct{}
 	// modulesNamesByDir is a map of directories to import paths. absolute path directory -> import path/module name
@@ -155,7 +158,7 @@ func packageFrom(pkg *build.Package) *Package {
 }
 
 // resolveLocal resolves pkg.ImportPath and pkg.SrcRoot for dir against
-// importPathsByDir when pkg.ImportPath is a relative path.
+// modulesByDir when pkg.ImportPath is a relative path.
 func resolveLocal(pkg *Package, dir string, modulesByDir map[string]string) {
 	if pkg.ImportPath != "." {
 		return
@@ -197,9 +200,10 @@ func resolveLocal(pkg *Package, dir string, modulesByDir map[string]string) {
 }
 
 // dependencyGraph constructs a map of directories to import paths when in
-// module aware mode and flattened reverse transitive dependency graph. When in
-// GOPATH mode the map of directories to import paths will be empty.
-func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]string, map[string]map[string]struct{}, error) {
+// module aware mode and flattened forward and reverse transitive dependency
+// graphs. When in GOPATH mode the map of directories to import paths will be
+// empty.
+func dependencyGraph(cfg *packages.Config, includePkgs []string) (moduleNamesByDir map[string]string, forward map[string]map[string]struct{}, reverse map[string]map[string]struct{}, err error) {
 	pkgs := make([]string, 0, len(includePkgs))
 	for _, pkg := range includePkgs {
 		pkgs = append(pkgs, fmt.Sprintf("%s...", pkg))
@@ -207,11 +211,12 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 
 	loadedPackages, err := packages.Load(cfg, pkgs...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("loading packages: %w", err)
+		return nil, nil, nil, fmt.Errorf("loading packages: %w", err)
 	}
 
-	reverse := make(map[string]map[string]struct{})
-	importPathsByDir := make(map[string]string)
+	moduleNamesByDir = make(map[string]string)
+	forward = make(map[string]map[string]struct{})
+	reverse = make(map[string]map[string]struct{})
 
 	seen := make(map[string]struct{})
 	var addPackage func(pkg *packages.Package)
@@ -221,7 +226,7 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 		}
 
 		if pkg.Module != nil && pkg.Module.Main {
-			importPathsByDir[pkg.Module.Dir] = pkg.Module.Path
+			moduleNamesByDir[pkg.Module.Dir] = pkg.Module.Path
 		}
 
 		seen[pkg.ID] = struct{}{}
@@ -241,13 +246,20 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 		// the package path of the primary package.
 		pkgPath := normalizeImportPath(pkg)
 
+		if _, ok := forward[pkgPath]; !ok {
+			forward[pkgPath] = make(map[string]struct{})
+		}
+
 		for _, importedPkg := range pkg.Imports {
 			addPackage(importedPkg)
 
 			importedPath := normalizeImportPath(importedPkg)
 
-			// do not attempt to add the normalized import path to the dependent
-			// graph when the normalized import path is the same as the package whose
+			fwdm := forward[pkgPath]
+			fwdm[importedPath] = struct{}{}
+
+			// do not attempt to add the normalized import path to the reverse graph
+			// when the normalized import path is the same as the package whose
 			// dependents are being calculated.
 			if importedPath == pkgPath {
 				continue
@@ -256,8 +268,8 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 			if _, ok := reverse[importedPath]; !ok {
 				reverse[importedPath] = make(map[string]struct{})
 			}
-			m := reverse[importedPath]
-			m[pkgPath] = struct{}{}
+			revm := reverse[importedPath]
+			revm[pkgPath] = struct{}{}
 		}
 	}
 
@@ -265,7 +277,7 @@ func dependencyGraph(cfg *packages.Config, includePkgs []string) (map[string]str
 		addPackage(pkg)
 	}
 
-	return importPathsByDir, reverse, nil
+	return moduleNamesByDir, forward, reverse, nil
 }
 
 // normalizeImportPath will return the import path of pkg. The import path may
