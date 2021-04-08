@@ -116,10 +116,10 @@ func (p *packageContext) PackageFromDir(dir string) (*Package, error) {
 
 // PackageFromEmptyDir returns a build package from a directory.
 func (p *packageContext) PackageFromEmptyDir(dir string) (*Package, error) {
-	// TODO(bc): construct the Package from the information about the module or GOPATH
 	pkg, err := p.ctx.ImportDir(dir, build.FindOnly)
 	pkg2 := packageFrom(pkg)
 	resolveLocal(pkg2, dir, p.modulesNamesByDir)
+	pkg2.ImportPath = stripVendor(pkg2.ImportPath)
 	p.packages[pkg2.ImportPath] = struct{}{}
 	return pkg2, err
 }
