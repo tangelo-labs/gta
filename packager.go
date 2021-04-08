@@ -109,6 +109,7 @@ func (p *packageContext) PackageFromDir(dir string) (*Package, error) {
 	pkg, err := p.ctx.ImportDir(dir, build.ImportComment)
 	pkg2 := packageFrom(pkg)
 	resolveLocal(pkg2, dir, p.modulesNamesByDir)
+	pkg2.ImportPath = stripVendor(pkg2.ImportPath)
 	p.packages[pkg2.ImportPath] = struct{}{}
 	return pkg2, err
 }
@@ -126,10 +127,19 @@ func (p *packageContext) PackageFromEmptyDir(dir string) (*Package, error) {
 // PackageFromImport returns a build package from an import path.
 func (p *packageContext) PackageFromImport(importPath string) (*Package, error) {
 	importPath = stripVendor(importPath)
-	pkg, err := p.ctx.Import(importPath, ".", build.ImportComment)
-	pkg2 := packageFrom(pkg)
-	p.packages[pkg2.ImportPath] = struct{}{}
-	return pkg2, err
+	if _, ok := p.forward[importPath]; !ok {
+		// TODO(bc): importPath is probably _not_ the right thing to use for Dir. So what _is_?
+		return nil, &build.NoGoError{Dir: importPath}
+	}
+
+	pkg := &Package{
+		ImportPath: importPath,
+		// TODO(bc): use the correct value for Dir
+		Dir: importPath,
+	}
+
+	p.packages[pkg.ImportPath] = struct{}{}
+	return pkg, nil
 }
 
 // DependentGraph returns a dependent graph based on the current imported packages.
