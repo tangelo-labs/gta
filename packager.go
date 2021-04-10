@@ -53,13 +53,13 @@ type Packager interface {
 	DependentGraph() (*Graph, error)
 }
 
-func NewPackager(prefixes, tags []string) Packager {
+func NewPackager(patterns, tags []string) Packager {
 	build.Default.BuildTags = tags
-	return newPackager(newLoadConfig(tags), build.Default, prefixes)
+	return newPackager(newLoadConfig(tags), build.Default, patterns)
 }
 
-func newPackager(cfg *packages.Config, ctx build.Context, prefixes []string) Packager {
-	moduleNamesByDir, forward, reverse, err := dependencyGraph(cfg, prefixes)
+func newPackager(cfg *packages.Config, ctx build.Context, patterns []string) Packager {
+	moduleNamesByDir, forward, reverse, err := dependencyGraph(cfg, patterns)
 	return &packageContext{
 		ctx:               &ctx,
 		err:               err,
@@ -213,13 +213,16 @@ func resolveLocal(pkg *Package, dir string, modulesByDir map[string]string) {
 // module aware mode and flattened forward and reverse transitive dependency
 // graphs. When in GOPATH mode the map of directories to import paths will be
 // empty.
-func dependencyGraph(cfg *packages.Config, includePkgs []string) (moduleNamesByDir map[string]string, forward map[string]map[string]struct{}, reverse map[string]map[string]struct{}, err error) {
-	pkgs := make([]string, 0, len(includePkgs))
-	for _, pkg := range includePkgs {
-		pkgs = append(pkgs, fmt.Sprintf("%s...", pkg))
+func dependencyGraph(cfg *packages.Config, patterns []string) (moduleNamesByDir map[string]string, forward map[string]map[string]struct{}, reverse map[string]map[string]struct{}, err error) {
+	for i, pat := range patterns {
+		if strings.HasPrefix(pat, "file=") || strings.HasSuffix(pat, "...") {
+			continue
+		}
+
+		patterns[i] = fmt.Sprintf("%s...", pat)
 	}
 
-	loadedPackages, err := packages.Load(cfg, pkgs...)
+	loadedPackages, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("loading packages: %w", err)
 	}
