@@ -222,6 +222,10 @@ func dependencyGraph(cfg *packages.Config, patterns []string) (moduleNamesByDir 
 		patterns[i] = fmt.Sprintf("%s...", pat)
 	}
 
+	if len(patterns) == 0 {
+		patterns = []string{"..."}
+	}
+
 	loadedPackages, err := packages.Load(cfg, patterns...)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("loading packages: %w", err)

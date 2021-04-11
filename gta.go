@@ -115,6 +115,7 @@ func New(opts ...Option) (*GTA, error) {
 		}
 
 		gta.packager = NewPackager(patterns, gta.tags)
+		// gta.packager = NewPackager(nil, gta.tags)
 	}
 
 	return gta, nil
