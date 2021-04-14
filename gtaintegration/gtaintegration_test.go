@@ -97,6 +97,8 @@ func TestPackageRemoval(t *testing.T) {
 		gta.SetPrefixes("gtaintegration"),
 	}
 
+	t.Cleanup(chdir(t, filepath.Join("src", "gtaintegration")))
+
 	gt, err := gta.New(options...)
 	if err != nil {
 		t.Fatalf("can't prepare gta: %v", err)
@@ -223,6 +225,8 @@ func TestPackageRemoval_AllGoFilesDeleted(t *testing.T) {
 		gta.SetPrefixes("gtaintegration"),
 	}
 
+	t.Cleanup(chdir(t, filepath.Join("src", "gtaintegration")))
+
 	gt, err := gta.New(options...)
 	if err != nil {
 		t.Fatalf("can't prepare gta: %v", err)
@@ -298,6 +302,8 @@ func TestPackageRemoval_RemoveDirectory(t *testing.T) {
 		gta.SetPrefixes("gtaintegration"),
 	}
 
+	t.Cleanup(chdir(t, filepath.Join("src", "gtaintegration")))
+
 	gt, err := gta.New(options...)
 	if err != nil {
 		t.Fatalf("can't prepare gta: %v", err)
@@ -372,6 +378,8 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 		gta.SetDiffer(gta.NewGitDiffer()),
 		gta.SetPrefixes("gtaintegration"),
 	}
+
+	t.Cleanup(chdir(t, filepath.Join("src", "gtaintegration")))
 
 	gt, err := gta.New(options...)
 	if err != nil {
@@ -453,6 +461,8 @@ func TestPackageRemoval_MovePackage_NonMasterBranch(t *testing.T) {
 		gta.SetDiffer(gta.NewGitDiffer(gta.SetBaseBranch("origin/feature-branch"))),
 		gta.SetPrefixes("gtaintegration"),
 	}
+
+	t.Cleanup(chdir(t, filepath.Join("src", "gtaintegration")))
 
 	gt, err := gta.New(options...)
 	if err != nil {
@@ -586,9 +596,7 @@ func testMain(m *testing.M) error {
 		return err
 	}
 
-	// This is super jank, but the default packager uses build.Default, so just set GOPATH in it...
-	// TODO(bc): how to deal with this in module aware mode? I suspect we should
-	// use subtests: one with a module and one without.
+	// TODO(bc): don't set GOPATH; it's unsupported as of Go 1.17
 	build.Default.GOPATH = wd
 	os.Setenv("GOPATH", wd)
 
@@ -749,4 +757,17 @@ func mapFromPackages(t *testing.T, pkg *gta.Packages) map[string]interface{} {
 	}
 
 	return m
+}
+
+func chdir(t *testing.T, dir string) func() {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	os.Chdir(dir)
+	return func() {
+		os.Chdir(wd)
+	}
 }

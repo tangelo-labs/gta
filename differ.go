@@ -17,8 +17,9 @@ import (
 	"sync"
 )
 
-// Differ implements a single method, used to note code diffs
-// and the dirs they occur.
+// A Differ implements provides methods that return values to understand the
+// directories and files that have changed.
+// and the dirs they in which occur.
 type Differ interface {
 	// Diff returns a set of absolute pathed directories that have files that
 	// have been modified.
