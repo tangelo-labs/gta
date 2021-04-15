@@ -155,9 +155,7 @@ func (g *GTA) ChangedPackages() (*Packages, error) {
 	packageFromImport := func(path string) (*Package, error) {
 		pkg, err := g.packager.PackageFromImport(path)
 		if err != nil {
-			if _, ok := err.(*build.NoGoError); !ok {
-				return nil, fmt.Errorf("building packages for %q: %v", path, err)
-			}
+			return nil, err
 		}
 
 		return pkg, nil

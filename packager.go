@@ -128,8 +128,7 @@ func (p *packageContext) PackageFromEmptyDir(dir string) (*Package, error) {
 func (p *packageContext) PackageFromImport(importPath string) (*Package, error) {
 	importPath = stripVendor(importPath)
 	if _, ok := p.forward[importPath]; !ok {
-		// TODO(bc): importPath is probably _not_ the right thing to use for Dir. So what _is_?
-		return nil, &build.NoGoError{Dir: importPath}
+		return nil, fmt.Errorf("%s not found", importPath)
 	}
 
 	pkg := &Package{
