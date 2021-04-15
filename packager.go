@@ -213,15 +213,22 @@ func resolveLocal(pkg *Package, dir string, modulesByDir map[string]string) {
 // graphs. When in GOPATH mode the map of directories to import paths will be
 // empty.
 func dependencyGraph(cfg *packages.Config, patterns []string) (moduleNamesByDir map[string]string, forward map[string]map[string]struct{}, reverse map[string]map[string]struct{}, err error) {
+	loadAllPackages := true
 	for i, pat := range patterns {
-		if strings.HasPrefix(pat, "file=") || strings.HasSuffix(pat, "...") {
+		if strings.HasPrefix(pat, "file=") {
+			continue
+		}
+
+		// prefixes were provided, so don't load all packages
+		loadAllPackages = false
+		if strings.HasSuffix(pat, "...") {
 			continue
 		}
 
 		patterns[i] = fmt.Sprintf("%s...", pat)
 	}
 
-	if len(patterns) == 0 {
+	if loadAllPackages {
 		patterns = []string{"..."}
 	}
 
