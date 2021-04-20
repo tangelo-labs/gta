@@ -347,7 +347,7 @@ func (g *GTA) findImportPath(abs string) (string, error) {
 		return path.Join(importPath, base), err
 	}
 
-	return path.Join(pkg.ImportPath, base), nil
+	return pkg.ImportPath, nil
 }
 
 type byPackageImportPath []Package
