@@ -109,13 +109,22 @@ func New(opts ...Option) (*GTA, error) {
 	// packager implementation does not load packages unnecessarily when the
 	// packager is provided as an option.
 	if gta.packager == nil {
-		patterns, err := patternsFrom(gta.differ, gta.prefixes)
-		if err != nil {
-			return nil, err
-		}
+		/*
+			patterns, err := patternsFrom(gta.differ, gta.prefixes)
+			if err != nil {
+				return nil, err
+			}
 
-		gta.packager = NewPackager(patterns, gta.tags)
-		// gta.packager = NewPackager(nil, gta.tags)
+			gta.packager = NewPackager(patterns, gta.tags)
+		*/
+
+		// Cause NewPackager to return a packager that loads all packages by
+		// passing a nil pattern.  This is important to ensure that all packages
+		// are loaded and that nothing is skipped based on build tag constraints
+		// when a file is changed. e.g. if a vendored file that is constrained to
+		// Windows is changed, that package wouldn't load at all and trying to find
+		// the package's dependencies would fail.
+		gta.packager = NewPackager(nil, gta.tags)
 	}
 
 	return gta, nil
