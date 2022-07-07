@@ -803,3 +803,54 @@ func TestJSONRoundtrip(t *testing.T) {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
+
+func TestIsIgnoredByGo(t *testing.T) {
+	tests := []struct {
+		in       string
+		expected bool
+	}{
+		{
+			in:       "/",
+			expected: false,
+		}, {
+			in:       "/foo",
+			expected: false,
+		}, {
+			in:       "/foo/bar",
+			expected: false,
+		}, {
+			in:       "foo",
+			expected: false,
+		}, {
+			in:       "testdata",
+			expected: true,
+		}, {
+			in:       "/testdata",
+			expected: true,
+		}, {
+			in:       "/foo/testdata",
+			expected: true,
+		}, {
+			in:       "foo/testdata/bar",
+			expected: true,
+		}, {
+			in:       "/foo/_bar",
+			expected: true,
+		}, {
+			in:       "/foo/.bar",
+			expected: true,
+		}, {
+			in:       "foo/_bar/quux",
+			expected: true,
+		}, {
+			in:       "/foo/.bar/quux",
+			expected: true,
+		},
+	}
+	for _, tt := range tests {
+		got := isIgnoredByGo(tt.in)
+		if want := tt.expected; got != want {
+			t.Errorf("isIgnoredByGoBuild(%q) = %v; want %v", tt.in, got, want)
+		}
+	}
+}

@@ -249,13 +249,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 			continue
 		}
 
-		// Avoid .foo, _foo, and testdata directory trees how the go tool does!
-		// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
-		// Above link is not guaranteed to work.
-		base := filepath.Base(abs)
-		parent := filepath.Base(filepath.Dir(abs))
-		// TODO(bc): do not ignore testdata directories - use their parent instead.
-		if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" || parent == "testdata" {
+		if isIgnoredByGo(abs) {
 			continue
 		}
 
@@ -401,4 +395,25 @@ func hasPrefixIn(s string, prefixes []string) bool {
 		}
 	}
 	return false
+}
+
+func isIgnoredByGo(name string) bool {
+	base := filepath.Base(name)
+	if base[0] == filepath.Separator {
+		return false
+	}
+
+	// Avoid .foo, _foo, and testdata directory trees how the go tool does!
+	// See https://github.com/golang/tools/blob/3a85b8d/go/buildutil/allpackages.go#L93
+	// Above link is not guaranteed to work.
+	if base == "" || base[0] == '.' || base[0] == '_' || base == "testdata" {
+		return true
+	}
+
+	dir := filepath.Dir(name)
+	if dir == "." {
+		return false
+	}
+
+	return isIgnoredByGo(filepath.Dir(name))
 }
