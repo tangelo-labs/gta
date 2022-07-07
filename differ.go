@@ -24,10 +24,6 @@ type Differ interface {
 	// Diff returns a set of absolute pathed directories that have files that
 	// have been modified.
 	Diff() (map[string]Directory, error)
-
-	// DiffFiles returns a map whose keys are absolute files paths. A map value
-	// is true when the file exists.
-	DiffFiles() (map[string]bool, error)
 }
 
 // GitDifferOption is an option function used to modify a git differ
@@ -118,23 +114,6 @@ func (d *differ) Diff() (map[string]Directory, error) {
 	}
 
 	return existsDirs, nil
-}
-
-// DiffFiles returns a set of changed files. The keys of the returned map are
-// absolute paths. The map values indicate whether or not the file exists: a
-// false value means the file was deleted.
-func (d *differ) DiffFiles() (map[string]bool, error) {
-	files, err := d.diff()
-	if err != nil {
-		return nil, err
-	}
-
-	existsFiles := map[string]bool{}
-	for abs := range files {
-		existsFiles[abs] = exists(abs)
-	}
-
-	return existsFiles, nil
 }
 
 func getMergeParents() (parent1 string, rightwardParents []string, err error) {
