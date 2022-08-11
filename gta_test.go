@@ -222,10 +222,10 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	// testChangedPackages executes ChangedPackages for each of the exporters and
 	// makes sure the return values match expectations. diff is a map of
 	// directory name fragments (i.e a relative directory sans ./) to Directory
-	// values that will be expanded and provided provided as a differ via
-	// testDiffer. shouldRemoveFile is a function that returns a boolean value
-	// indicating whether a file identified by a filename fragment should be
-	// deleted. want is the expected value from ChangedPackages().
+	// values that will be expanded and provided as a differ via testDiffer.
+	// shouldRemoveFile is a function that returns a boolean value indicating
+	// whether a file identified by a filename fragment should be deleted. want
+	// is the expected value from ChangedPackages().
 	testChangedPackages := func(t *testing.T, diff map[string]Directory, shouldRemoveFile func(string) bool, want *Packages) {
 		t.Helper()
 
@@ -664,14 +664,15 @@ func TestNoBuildableGoFiles(t *testing.T) {
 }
 
 func TestSpecialCaseDirectory(t *testing.T) {
-	// We want to ignore the special case directory "testdata"
+	// We want to ignore the special case directory testdata for all but the
+	// package that contains the testdata directory.
 	const (
 		special1 = "specia/case/testdata"
 		special2 = "specia/case/testdata/multi"
 	)
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			special1: Directory{Exists: true}, // this
+			special1: Directory{Exists: true},
 			special2: Directory{Exists: true},
 			"dirC":   Directory{Exists: true},
 		},
@@ -684,14 +685,19 @@ func TestSpecialCaseDirectory(t *testing.T) {
 			"B": map[string]bool{
 				"A": true,
 			},
+			"specia/case": map[string]bool{
+				"D": true,
+			},
 		},
 	}
 
 	pkgr := &testPackager{
 		dirs2Imports: map[string]string{
-			"dirA": "A",
-			"dirB": "B",
-			"dirC": "C",
+			"dirA":        "A",
+			"dirB":        "B",
+			"dirC":        "C",
+			"dirD":        "D",
+			"specia/case": "specia/case",
 		},
 		graph: graph,
 		errs: map[string]error{
@@ -708,6 +714,7 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		Package{ImportPath: "A"},
 		Package{ImportPath: "B"},
 		Package{ImportPath: "C"},
+		Package{ImportPath: "specia/case"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
@@ -851,6 +858,61 @@ func TestIsIgnoredByGo(t *testing.T) {
 		got := isIgnoredByGo(tt.in)
 		if want := tt.expected; got != want {
 			t.Errorf("isIgnoredByGoBuild(%q) = %v; want %v", tt.in, got, want)
+		}
+	}
+
+}
+
+func TestDeepestUnignoredDir(t *testing.T) {
+	tests := []struct {
+		in       string
+		expected string
+	}{
+		{
+			in:       "/",
+			expected: "/",
+		}, {
+			in:       "/foo",
+			expected: "/foo",
+		}, {
+			in:       "/foo/bar",
+			expected: "/foo/bar",
+		}, {
+			in:       "foo",
+			expected: "foo",
+		}, {
+			in:       "testdata",
+			expected: ".",
+		}, {
+			in:       "/testdata",
+			expected: "/",
+		}, {
+			in:       "/foo/testdata",
+			expected: "/foo",
+		}, {
+			in:       "foo/testdata/bar",
+			expected: "foo",
+		}, {
+			in:       "/foo/_bar",
+			expected: "/foo",
+		}, {
+			in:       "/foo/.bar",
+			expected: "/foo",
+		}, {
+			in:       "foo/_bar/quux",
+			expected: "foo",
+		}, {
+			in:       "/foo/.bar/quux",
+			expected: "/foo",
+		}, {
+			in:       "/foo/bar/testdata/quux/_baz",
+			expected: "/foo/bar",
+		},
+	}
+	for _, tt := range tests {
+		got := deepestUnignoredDir(tt.in)
+		if want := tt.expected; got != want {
+			t.Errorf("deepestUnignoredDir(%q) = %v; want %v", tt.in, got, want)
 		}
 	}
 }

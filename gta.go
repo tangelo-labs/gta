@@ -240,16 +240,42 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 	// we build our set of initial dirty packages from the git diff. The map
 	// value is true when the package was deleted.
 	changed := make(map[string]bool)
+	onlyTestsAffected := make(map[string]struct{})
+	onlyTestPackagesChanged := make(map[string]struct{})
 	for abs, dir := range dirs {
 		// TODO(bc): handle changes to go.mod when vendoring is not being used.
 
-		// ignore deleted directories that contained no go files.
-		// TODO(bc): make sure it was not within a testdata directory.
-		if !dir.Exists && !hasGoFile(dir.Files) {
-			continue
+		// ignore deleted directories that did not contain files.
+		if isIgnoredByGo(abs) {
+			if !isTestData(abs) {
+				continue
+			}
+
+			absAncestor := deepestUnignoredDir(abs)
+			if _, ok := dirs[absAncestor]; ok {
+				// continue when the deepest unignored directory will be explicitly handled
+				continue
+			}
+
+			// TODO(bc): take GOPATH / module root into account and don't try going above them?
+			if absAncestor == "/" {
+				continue
+			}
+
+			// set abs and dir to respective values to be evaluated.
+			abs = absAncestor
+			onlyTestsAffected[abs] = struct{}{}
+			// Assume the directory exists; since it's not in the list of dirs, it
+			// likely still exists. The only way it wouldn't would be if the only
+			// files in it were all deleted and it didn't directly contain any files.
+			// It should be ok to assume it does exist even in that unlikely
+			// situation.
+			dir = Directory{
+				Exists: true,
+			}
 		}
 
-		if isIgnoredByGo(abs) {
+		if !dir.Exists && !hasGoFile(dir.Files) {
 			continue
 		}
 
@@ -288,6 +314,9 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 
 		// create a simple set of changed pkgs by import path
 		changed[pkg.ImportPath] = false
+		if _, ok := onlyTestsAffected[abs]; ok {
+			onlyTestPackagesChanged[pkg.ImportPath] = struct{}{}
+		}
 	}
 
 	// we build the dependent graph
@@ -299,6 +328,12 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 	paths := map[string]map[string]bool{}
 	for change := range changed {
 		marked := make(map[string]bool)
+
+		if _, ok := onlyTestPackagesChanged[change]; ok {
+			marked[change] = true
+			paths[change] = marked
+			continue
+		}
 
 		// we traverse the graph and build our list of mark all dependents
 		graph.Traverse(change, marked)
@@ -416,4 +451,34 @@ func isIgnoredByGo(name string) bool {
 	}
 
 	return isIgnoredByGo(filepath.Dir(name))
+}
+
+func isTestData(name string) bool {
+	base := filepath.Base(name)
+	if base[0] == filepath.Separator {
+		return false
+	}
+
+	if name == "testdata" || base == "testdata" {
+		return true
+	}
+
+	dir := filepath.Dir(name)
+	if dir == "." {
+		return false
+	}
+
+	return isTestData(filepath.Dir(name))
+}
+
+func deepestUnignoredDir(name string) string {
+	if name == "." || name == "/" {
+		return name
+	}
+
+	if isIgnoredByGo(name) {
+		return deepestUnignoredDir(filepath.Dir(name))
+	}
+
+	return name
 }
