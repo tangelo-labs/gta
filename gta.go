@@ -273,6 +273,10 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 			dir = Directory{
 				Exists: true,
 			}
+		} else {
+			if hasOnlyTestFilenames(dir.Files) {
+				onlyTestsAffected[abs] = struct{}{}
+			}
 		}
 
 		if !dir.Exists && !hasGoFile(dir.Files) {
@@ -291,6 +295,9 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 					pkg.ImportPath = importPath
 
 					changed[pkg.ImportPath] = true
+					if _, ok := onlyTestsAffected[abs]; ok {
+						onlyTestPackagesChanged[pkg.ImportPath] = struct{}{}
+					}
 					continue
 				}
 				// there are and were no buildable go files in this directory
@@ -305,7 +312,11 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 					if err != nil {
 						continue
 					}
+
 					changed[importPath] = true
+					if _, ok := onlyTestsAffected[abs]; ok {
+						onlyTestPackagesChanged[importPath] = struct{}{}
+					}
 					continue
 				}
 			}
@@ -481,4 +492,13 @@ func deepestUnignoredDir(name string) string {
 	}
 
 	return name
+}
+
+func hasOnlyTestFilenames(sl []string) bool {
+	for _, v := range sl {
+		if !strings.HasSuffix(v, "_test.go") {
+			return false
+		}
+	}
+	return true
 }
