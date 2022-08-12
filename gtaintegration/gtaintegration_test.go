@@ -167,7 +167,7 @@ func TestPackageRemoval(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
@@ -261,7 +261,7 @@ func TestPackageRemoval_AllGoFilesDeleted(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
@@ -338,7 +338,7 @@ func TestPackageRemoval_RemoveDirectory(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
@@ -421,7 +421,7 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
@@ -504,7 +504,7 @@ func TestPackageRemoval_MovePackage_NonMasterBranch(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
@@ -562,7 +562,7 @@ func TestNonPackageRemoval(t *testing.T) {
 		t.Fatalf("err = %q; want nil", err)
 	}
 
-	if diff := cmp.Diff(mapFromPackages(t, got), mapFromPackages(t, want)); diff != "" {
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
 	}
 }
