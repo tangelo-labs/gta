@@ -402,24 +402,3 @@ func hasPrefixIn(s string, prefixes []string) bool {
 	}
 	return false
 }
-
-func patternsFrom(differ Differ, prefixes []string) ([]string, error) {
-	dirs, err := differ.Diff()
-	if err != nil {
-		return nil, err
-	}
-	files, err := differ.DiffFiles()
-	if err != nil {
-		return nil, err
-	}
-
-	patterns := make([]string, 0, len(files))
-	for f := range files {
-		if d := dirs[filepath.Dir(f)]; !d.Exists {
-			continue
-		}
-		patterns = append(patterns, "file="+f)
-	}
-
-	return append(patterns, prefixes...), nil
-}

@@ -98,8 +98,6 @@ type packageContext struct {
 	reverse map[string]map[string]struct{}
 	// modulesNamesByDir is a map of directories to import paths. absolute path directory -> import path/module name
 	modulesNamesByDir map[string]string
-
-	packagesConfig *packages.Config
 }
 
 // PackageFromDir returns a build package from a directory.

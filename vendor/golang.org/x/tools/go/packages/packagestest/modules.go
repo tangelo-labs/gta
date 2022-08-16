@@ -23,20 +23,25 @@ import (
 // Each "repository" is put in it's own module, and the module file generated
 // will have replace directives for all other modules.
 // Given the two files
-//     golang.org/repoa#a/a.go
-//     golang.org/repob#b/b.go
+//
+//	golang.org/repoa#a/a.go
+//	golang.org/repob#b/b.go
+//
 // You would get the directory layout
-//     /sometemporarydirectory
-//     ├── repoa
-//     │   ├── a
-//     │   │   └── a.go
-//     │   └── go.mod
-//     └── repob
-//         ├── b
-//         │   └── b.go
-//         └── go.mod
+//
+//	/sometemporarydirectory
+//	├── repoa
+//	│   ├── a
+//	│   │   └── a.go
+//	│   └── go.mod
+//	└── repob
+//	    ├── b
+//	    │   └── b.go
+//	    └── go.mod
+//
 // and the working directory would be
-//     /sometemporarydirectory/repoa
+//
+//	/sometemporarydirectory/repoa
 var Modules = modules{}
 
 type modules struct{}
@@ -174,7 +179,7 @@ func (modules) Finalize(exported *Exported) error {
 	// stuff in cache. All the files created by Export should be recreated.
 	inv := gocommand.Invocation{
 		Verb:       "mod",
-		Args:       []string{"download"},
+		Args:       []string{"download", "all"},
 		Env:        exported.Config.Env,
 		BuildFlags: exported.Config.BuildFlags,
 		WorkingDir: exported.Config.Dir,
