@@ -615,7 +615,7 @@ func createRepo(path string) error {
 
 	ctx := context.Background()
 	// git init
-	if _, err := runGit(ctx, path, "init"); err != nil {
+	if _, err := runGit(ctx, path, "init", "-b", "master"); err != nil {
 		return err
 	}
 
