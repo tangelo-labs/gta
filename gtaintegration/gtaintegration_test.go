@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/digitalocean/gta"
@@ -24,7 +25,7 @@ import (
 )
 
 const (
-	repoRoot = "testdata/gtaintegration"
+	repoRoot = "gtaintegration"
 )
 
 func TestMain(m *testing.M) {
@@ -675,11 +676,11 @@ func prepareTemp() string {
 			return err
 		}
 
+		dstPath := filepath.Join(d, strings.TrimPrefix(path, "testdata/"))
 		if info.IsDir() {
-			dir := filepath.Join(d, path)
-			err := os.Mkdir(dir, info.Mode())
+			err := os.Mkdir(dstPath, info.Mode())
 			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("could not create directory (%s)", dir))
+				return errors.Wrap(err, fmt.Sprintf("could not create directory (%s)", dstPath))
 			}
 			return nil
 		}
@@ -690,9 +691,9 @@ func prepareTemp() string {
 		}
 		defer src.Close()
 
-		dst, err := os.Create(filepath.Join(d, path))
+		dst, err := os.Create(dstPath)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("could not open file (%s)", path))
+			return errors.Wrap(err, fmt.Sprintf("could not create file (%s)", dstPath))
 		}
 		defer dst.Close()
 

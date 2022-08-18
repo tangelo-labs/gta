@@ -84,7 +84,10 @@ func TestGTA(t *testing.T) {
 	// dirC is dirty, we expect them all to be marked
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			"dirC": Directory{Exists: true},
+			"dirC": Directory{
+				Exists: true,
+				Files:  []string{"foo.go"},
+			},
 		},
 	}
 
@@ -139,8 +142,8 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		difr := &testDiffer{
 			diff: map[string]Directory{
-				"dirC": Directory{Exists: true},
-				"dirH": Directory{Exists: true},
+				"dirC": Directory{Exists: true, Files: []string{"c.go"}},
+				"dirH": Directory{Exists: true, Files: []string{"h.go"}},
 			},
 		}
 
@@ -222,10 +225,10 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	// testChangedPackages executes ChangedPackages for each of the exporters and
 	// makes sure the return values match expectations. diff is a map of
 	// directory name fragments (i.e a relative directory sans ./) to Directory
-	// values that will be expanded and provided provided as a differ via
-	// testDiffer. shouldRemoveFile is a function that returns a boolean value
-	// indicating whether a file identified by a filename fragment should be
-	// deleted. want is the expected value from ChangedPackages().
+	// values that will be expanded and provided as a differ via testDiffer.
+	// shouldRemoveFile is a function that returns a boolean value indicating
+	// whether a file identified by a filename fragment should be deleted. want
+	// is the expected value from ChangedPackages().
 	testChangedPackages := func(t *testing.T, diff map[string]Directory, shouldRemoveFile func(string) bool, want *Packages) {
 		t.Helper()
 
@@ -494,6 +497,34 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		testChangedPackages(t, diff, nil, want)
 	})
+
+	t.Run("change transitive dependency test", func(t *testing.T) {
+		diff := map[string]Directory{
+			"foo":       {Exists: true, Files: []string{"foo.go"}},
+			"fooclient": {Exists: true, Files: []string{"fooclient_test.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"foo": {
+					{ImportPath: "fooclient", Dir: "fooclient"},
+					{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+				{ImportPath: "fooclient", Dir: "fooclient"},
+				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+
 	t.Run("change no dependency", func(t *testing.T) {
 		diff := map[string]Directory{
 			"unimported": {Exists: true, Files: []string{"unimported.go"}},
@@ -513,7 +544,7 @@ func TestGTA_ChangedPackages(t *testing.T) {
 	})
 	t.Run("change external", func(t *testing.T) {
 		diff := map[string]Directory{
-			"foo": {Exists: true, Files: []string{"foo_test.go"}},
+			"foo": {Exists: true, Files: []string{"foo.go", "foo_test.go"}},
 		}
 
 		want := &Packages{
@@ -530,6 +561,23 @@ func TestGTA_ChangedPackages(t *testing.T) {
 				{ImportPath: "foo", Dir: "foo"},
 				{ImportPath: "fooclient", Dir: "fooclient"},
 				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+	t.Run("change test", func(t *testing.T) {
+		diff := map[string]Directory{
+			"foo": {Exists: true, Files: []string{"foo_test.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{},
+			Changes: []Package{
+				{ImportPath: "foo", Dir: "foo"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "foo", Dir: "foo"},
 			},
 		}
 
@@ -664,16 +712,17 @@ func TestNoBuildableGoFiles(t *testing.T) {
 }
 
 func TestSpecialCaseDirectory(t *testing.T) {
-	// We want to ignore the special case directory "testdata"
+	// We want to ignore the special case directory testdata for all but the
+	// package that contains the testdata directory.
 	const (
 		special1 = "specia/case/testdata"
 		special2 = "specia/case/testdata/multi"
 	)
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			special1: Directory{Exists: true}, // this
+			special1: Directory{Exists: true},
 			special2: Directory{Exists: true},
-			"dirC":   Directory{Exists: true},
+			"dirC":   Directory{Exists: true, Files: []string{"c.go"}},
 		},
 	}
 	graph := &Graph{
@@ -684,14 +733,19 @@ func TestSpecialCaseDirectory(t *testing.T) {
 			"B": map[string]bool{
 				"A": true,
 			},
+			"specia/case": map[string]bool{
+				"D": true,
+			},
 		},
 	}
 
 	pkgr := &testPackager{
 		dirs2Imports: map[string]string{
-			"dirA": "A",
-			"dirB": "B",
-			"dirC": "C",
+			"dirA":        "A",
+			"dirB":        "B",
+			"dirC":        "C",
+			"dirD":        "D",
+			"specia/case": "specia/case",
 		},
 		graph: graph,
 		errs: map[string]error{
@@ -708,6 +762,7 @@ func TestSpecialCaseDirectory(t *testing.T) {
 		Package{ImportPath: "A"},
 		Package{ImportPath: "B"},
 		Package{ImportPath: "C"},
+		Package{ImportPath: "specia/case"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
@@ -801,5 +856,111 @@ func TestJSONRoundtrip(t *testing.T) {
 
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Errorf("(-want, +got)\n%s", diff)
+	}
+}
+
+func TestIsIgnoredByGo(t *testing.T) {
+	tests := []struct {
+		in       string
+		expected bool
+	}{
+		{
+			in:       "/",
+			expected: false,
+		}, {
+			in:       "/foo",
+			expected: false,
+		}, {
+			in:       "/foo/bar",
+			expected: false,
+		}, {
+			in:       "foo",
+			expected: false,
+		}, {
+			in:       "testdata",
+			expected: true,
+		}, {
+			in:       "/testdata",
+			expected: true,
+		}, {
+			in:       "/foo/testdata",
+			expected: true,
+		}, {
+			in:       "foo/testdata/bar",
+			expected: true,
+		}, {
+			in:       "/foo/_bar",
+			expected: true,
+		}, {
+			in:       "/foo/.bar",
+			expected: true,
+		}, {
+			in:       "foo/_bar/quux",
+			expected: true,
+		}, {
+			in:       "/foo/.bar/quux",
+			expected: true,
+		},
+	}
+	for _, tt := range tests {
+		got := isIgnoredByGo(tt.in)
+		if want := tt.expected; got != want {
+			t.Errorf("isIgnoredByGoBuild(%q) = %v; want %v", tt.in, got, want)
+		}
+	}
+
+}
+
+func TestDeepestUnignoredDir(t *testing.T) {
+	tests := []struct {
+		in       string
+		expected string
+	}{
+		{
+			in:       "/",
+			expected: "/",
+		}, {
+			in:       "/foo",
+			expected: "/foo",
+		}, {
+			in:       "/foo/bar",
+			expected: "/foo/bar",
+		}, {
+			in:       "foo",
+			expected: "foo",
+		}, {
+			in:       "testdata",
+			expected: ".",
+		}, {
+			in:       "/testdata",
+			expected: "/",
+		}, {
+			in:       "/foo/testdata",
+			expected: "/foo",
+		}, {
+			in:       "foo/testdata/bar",
+			expected: "foo",
+		}, {
+			in:       "/foo/_bar",
+			expected: "/foo",
+		}, {
+			in:       "/foo/.bar",
+			expected: "/foo",
+		}, {
+			in:       "foo/_bar/quux",
+			expected: "foo",
+		}, {
+			in:       "/foo/.bar/quux",
+			expected: "/foo",
+		}, {
+			in:       "/foo/bar/testdata/quux/_baz",
+			expected: "/foo/bar",
+		},
+	}
+	for _, tt := range tests {
+		got := deepestUnignoredDir(tt.in)
+		if want := tt.expected; got != want {
+			t.Errorf("deepestUnignoredDir(%q) = %v; want %v", tt.in, got, want)
+		}
 	}
 }
