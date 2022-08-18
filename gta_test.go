@@ -79,6 +79,10 @@ func (t *testPackager) DependentGraph() (*Graph, error) {
 	return t.graph, nil
 }
 
+func (_ *testPackager) EmbeddedBy(_ string) []string {
+	return nil
+}
+
 func TestGTA(t *testing.T) {
 	// A depends on B depends on C
 	// dirC is dirty, we expect them all to be marked
@@ -602,6 +606,28 @@ func TestGTA_ChangedPackages(t *testing.T) {
 				{ImportPath: "bar_test", Dir: "bar_test"},
 				{ImportPath: "fooclient", Dir: "fooclient"},
 				{ImportPath: "fooclientclient", Dir: "fooclientclient"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
+	t.Run("change embedded file", func(t *testing.T) {
+		diff := map[string]Directory{
+			"embed": {Exists: true, Files: []string{"embed.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{
+				"embed": {
+					{ImportPath: "embedclient", Dir: "embedclient"},
+				},
+			},
+			Changes: []Package{
+				{ImportPath: "embed", Dir: "embed"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "embed", Dir: "embed"},
+				{ImportPath: "embedclient", Dir: "embedclient"},
 			},
 		}
 
