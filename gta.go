@@ -140,17 +140,17 @@ func New(opts ...Option) (*GTA, error) {
 // "foo" has changed, it has two dependent packages, "bar" and "qux". The
 // result would be then:
 //
-//   Dependencies = {"foo": ["bar", "qux"]}
-//   Changes      = ["foo"]
-//   AllChanges   = ["foo", "bar", "qux]
+//	Dependencies = {"foo": ["bar", "qux"]}
+//	Changes      = ["foo"]
+//	AllChanges   = ["foo", "bar", "qux]
 //
 // Note that two different changed package might have the same dependent
 // package. Below you see that both "foo" and "foo2" has changed. Each have
 // "bar" because "bar" imports both "foo" and "foo2", i.e:
 //
-//   Dependencies = {"foo": ["bar", "qux"], "foo2" : ["afa", "bar", "qux"]}
-//   Changes      = ["foo", "foo2"]
-//   AllChanges   = ["foo", "foo2", "afa", "bar", "qux]
+//	Dependencies = {"foo": ["bar", "qux"], "foo2" : ["afa", "bar", "qux"]}
+//	Changes      = ["foo", "foo2"]
+//	AllChanges   = ["foo", "foo2", "afa", "bar", "qux]
 func (g *GTA) ChangedPackages() (*Packages, error) {
 	paths, err := g.markedPackages()
 	if err != nil {
@@ -237,15 +237,31 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		return nil, fmt.Errorf("diffing directory for dirty packages, %v", err)
 	}
 
-	// we build our set of initial dirty packages from the git diff. The map
-	// value is true when the package was deleted.
+	// We build our set of initial dirty packages from the git diff. The map
+	// value is true when the package was deleted. The map keys are package
+	// import paths.
 	changed := make(map[string]bool)
+	embeddedChanged := make(map[string]struct{})
 	onlyTestsAffected := make(map[string]struct{})
 	onlyTestPackagesChanged := make(map[string]struct{})
 	for abs, dir := range dirs {
 		// TODO(bc): handle changes to go.mod when vendoring is not being used.
 
-		// ignore deleted directories that did not contain files.
+		// Add packages that embed the files of dir.
+		for _, f := range dir.Files {
+			// An embedded file may:
+			//   1. reside in a directory that contains go files and
+			//   2. reside in a directory that does not contain any go files
+			//   3. be embedded by multiple packages
+			// Therefore, do not try short-circuiting anything; just record that the
+			// embedding packages are changed.
+			for _, importPath := range g.packager.EmbeddedBy(filepath.Join(abs, f)) {
+				embeddedChanged[importPath] = struct{}{}
+				// Set the value to false, because the package is known to exist.
+				changed[importPath] = false
+			}
+		}
+
 		if isIgnoredByGo(abs) {
 			if !isTestData(abs) {
 				continue
@@ -266,7 +282,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 			abs = absAncestor
 			onlyTestsAffected[abs] = struct{}{}
 			// Assume the directory exists; since it's not in the list of dirs, it
-			// likely still exists. The only way it wouldn't would be if the only
+			// likely still exists. The only way it wouldn't would be is if the only
 			// files in it were all deleted and it didn't directly contain any files.
 			// It should be ok to assume it does exist even in that unlikely
 			// situation.
@@ -279,6 +295,9 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 			}
 		}
 
+		// Ignore deleted directories that did not contain files. Continue without
+		// considering embedded files, because it is unknown whether a deleted file
+		// was previously embedded.
 		if !dir.Exists && !hasGoFile(dir.Files) {
 			continue
 		}
@@ -327,6 +346,12 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		changed[pkg.ImportPath] = false
 		if _, ok := onlyTestsAffected[abs]; ok {
 			onlyTestPackagesChanged[pkg.ImportPath] = struct{}{}
+		}
+	}
+
+	for k := range onlyTestPackagesChanged {
+		if _, ok := embeddedChanged[k]; ok {
+			delete(onlyTestPackagesChanged, k)
 		}
 	}
 
