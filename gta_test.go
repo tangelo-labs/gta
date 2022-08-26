@@ -633,6 +633,24 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		testChangedPackages(t, diff, nil, want)
 	})
+
+	t.Run("change constrained package", func(t *testing.T) {
+		diff := map[string]Directory{
+			"constrained": {Exists: true, Files: []string{"constrained.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{},
+			Changes: []Package{
+				{ImportPath: "constrained"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "constrained"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
 }
 
 func TestGTA_Prefix(t *testing.T) {
