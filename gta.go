@@ -366,7 +366,7 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		marked := make(map[string]bool)
 
 		if _, ok := onlyTestPackagesChanged[change]; ok {
-			marked[change] = true
+			marked[change] = !changed[change]
 			paths[change] = marked
 			continue
 		}
