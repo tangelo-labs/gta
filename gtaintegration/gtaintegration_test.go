@@ -427,6 +427,132 @@ func TestPackageRemoval_MovePackage(t *testing.T) {
 	}
 }
 
+func TestChangesAfterMergeBaseBranch(t *testing.T) {
+	ctx := context.Background()
+
+	baseBranch := t.Name() + "-base"
+	// create a base branch
+	if _, err := runGit(ctx, ".", "checkout", "-b", baseBranch, "master"); err != nil {
+		t.Fatal(err)
+	}
+
+	// move some files to a different directory
+	if _, err := runGit(ctx, ".", "mv", "src/gtaintegration/movedfrom", "src/gtaintegration/movedto"); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := runGit(ctx, ".", "commit", "-a", "-m", "moved some stuff"); err != nil {
+		t.Fatal(err)
+	}
+
+	// create the topic branch from the original branch point of the base branch
+	if _, err := runGit(ctx, ".", "checkout", "-b", t.Name(), baseBranch+"^"); err != nil {
+		t.Fatal(err)
+	}
+
+	// fully delete deleted
+	if err := os.RemoveAll(filepath.Clean("src/gtaintegration/deleted")); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "status", "--short")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+
+	if _, err := runGit(ctx, ".", "commit", "-a", "-m", "delete some stuff"); err != nil {
+		t.Fatal(err)
+	}
+
+	// merge the base branch. After this, the branch topology should look like this:
+	// * (topic) merge
+	// |\
+	// * | delete some stuff
+	// | * moved some stuff
+	// | /
+	// * (master) initial commit
+	if _, err := runGit(ctx, ".", "merge", "--no-ff", baseBranch); err != nil {
+		t.Fatal(err)
+	}
+
+	if testing.Verbose() {
+		out, err := runGit(ctx, ".", "diff", baseBranch+"^...HEAD", "--name-only", "--no-renames")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		t.Logf("\n%s", out)
+	}
+
+	options := []gta.Option{
+		gta.SetDiffer(gta.NewGitDiffer(gta.SetBaseBranch(baseBranch))),
+		gta.SetPrefixes("gtaintegration"),
+	}
+
+	t.Cleanup(chdir(t, filepath.Join("src", "gtaintegration")))
+
+	gt, err := gta.New(options...)
+	if err != nil {
+		t.Fatalf("can't prepare gta: %v", err)
+	}
+
+	want := &gta.Packages{
+		Dependencies: map[string][]gta.Package{
+			"gtaintegration/movedfrom": []gta.Package{
+				gta.Package{
+					ImportPath: "gtaintegration/movedfromclient",
+				},
+			},
+			"gtaintegration/deleted": []gta.Package{
+				gta.Package{
+					ImportPath: "gtaintegration/deletedclient",
+				},
+			},
+		},
+		Changes: []gta.Package{
+			gta.Package{
+				ImportPath: "gtaintegration/deleted",
+			},
+			gta.Package{
+				ImportPath: "gtaintegration/movedfrom",
+			},
+			gta.Package{
+				ImportPath: "gtaintegration/movedto",
+			},
+		},
+		AllChanges: []gta.Package{
+			gta.Package{
+				ImportPath: "gtaintegration/deleted",
+			},
+			gta.Package{
+				ImportPath: "gtaintegration/deletedclient",
+			},
+			gta.Package{
+				ImportPath: "gtaintegration/movedfrom",
+			},
+			gta.Package{
+				ImportPath: "gtaintegration/movedfromclient",
+			},
+			gta.Package{
+				ImportPath: "gtaintegration/movedto",
+			},
+		},
+	}
+
+	got, err := gt.ChangedPackages()
+	if err != nil {
+		t.Fatalf("err = %q; want nil", err)
+	}
+
+	if diff := cmp.Diff(mapFromPackages(t, want), mapFromPackages(t, got)); diff != "" {
+		t.Errorf("(-want, +got)\n%s", diff)
+	}
+}
+
 func TestPackageRemoval_MovePackage_NonMasterBranch(t *testing.T) {
 	ctx := context.Background()
 	if _, err := runGit(ctx, ".", "checkout", "-b", t.Name(), "master"); err != nil {
