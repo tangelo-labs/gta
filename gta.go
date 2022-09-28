@@ -12,6 +12,8 @@ import (
 	"fmt"
 	"go/build"
 	"go/scanner"
+	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"sort"
@@ -89,6 +91,7 @@ type GTA struct {
 	packager Packager
 	prefixes []string
 	tags     []string
+	roots    []string
 }
 
 // New returns a new GTA with various options passed to New. Options will be
@@ -103,6 +106,14 @@ func New(opts ...Option) (*GTA, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if gta.roots == nil {
+		roots, err := toplevel()
+		if err != nil {
+			return nil, fmt.Errorf("could not get top level directory")
+		}
+		gta.roots = roots
 	}
 
 	// set the default packager after applying option so that the default
@@ -262,12 +273,12 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 			}
 		}
 
-		if isIgnoredByGo(abs) {
+		if isIgnoredByGo(abs, g.roots) {
 			if !isTestData(abs) {
 				continue
 			}
 
-			absAncestor := deepestUnignoredDir(abs)
+			absAncestor := deepestUnignoredDir(abs, g.roots)
 			if _, ok := dirs[absAncestor]; ok {
 				// continue when the deepest unignored directory will be explicitly handled
 				continue
@@ -468,7 +479,13 @@ func hasPrefixIn(s string, prefixes []string) bool {
 	return false
 }
 
-func isIgnoredByGo(name string) bool {
+func isIgnoredByGo(name string, roots []string) bool {
+	for _, root := range roots {
+		if root == name {
+			return false
+		}
+	}
+
 	base := filepath.Base(name)
 	if base[0] == filepath.Separator {
 		return false
@@ -486,7 +503,7 @@ func isIgnoredByGo(name string) bool {
 		return false
 	}
 
-	return isIgnoredByGo(filepath.Dir(name))
+	return isIgnoredByGo(filepath.Dir(name), roots)
 }
 
 func isTestData(name string) bool {
@@ -507,13 +524,13 @@ func isTestData(name string) bool {
 	return isTestData(filepath.Dir(name))
 }
 
-func deepestUnignoredDir(name string) string {
+func deepestUnignoredDir(name string, roots []string) string {
 	if name == "." || name == "/" {
 		return name
 	}
 
-	if isIgnoredByGo(name) {
-		return deepestUnignoredDir(filepath.Dir(name))
+	if isIgnoredByGo(name, roots) {
+		return deepestUnignoredDir(filepath.Dir(name), roots)
 	}
 
 	return name
@@ -526,4 +543,41 @@ func hasOnlyTestFilenames(sl []string) bool {
 		}
 	}
 	return true
+}
+
+func toplevel() ([]string, error) {
+	if os.Getenv("GO111MODULE") == "off" {
+		return gopaths()
+	}
+
+	root, err := moduleroot()
+	if err != nil {
+		return nil, err
+	}
+	return []string{root}, nil
+
+}
+
+func gopaths() ([]string, error) {
+	cmd := exec.Command("go", "env", "GOPATH")
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("could get not get GOPATH: %w", err)
+	}
+
+	var roots []string
+	for _, v := range strings.Split(string(b), string(os.PathListSeparator)) {
+		roots = append(roots, strings.TrimSpace(v))
+	}
+	return roots, nil
+}
+
+func moduleroot() (string, error) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Dir}}")
+	b, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("could get not get module root: %w", err)
+	}
+
+	return strings.TrimSpace(string(b)), nil
 }
