@@ -944,10 +944,13 @@ func TestIsIgnoredByGo(t *testing.T) {
 		}, {
 			in:       "/foo/.bar/quux",
 			expected: true,
+		}, {
+			in:       "/foo/_bar/baz",
+			expected: false,
 		},
 	}
 	for _, tt := range tests {
-		got := isIgnoredByGo(tt.in)
+		got := isIgnoredByGo(tt.in, []string{"/", "/foo/_bar/baz"})
 		if want := tt.expected; got != want {
 			t.Errorf("isIgnoredByGoBuild(%q) = %v; want %v", tt.in, got, want)
 		}
@@ -1002,7 +1005,7 @@ func TestDeepestUnignoredDir(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		got := deepestUnignoredDir(tt.in)
+		got := deepestUnignoredDir(tt.in, []string{"/"})
 		if want := tt.expected; got != want {
 			t.Errorf("deepestUnignoredDir(%q) = %v; want %v", tt.in, got, want)
 		}
