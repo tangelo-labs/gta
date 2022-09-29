@@ -944,10 +944,13 @@ func TestIsIgnoredByGo(t *testing.T) {
 		}, {
 			in:       "/foo/.bar/quux",
 			expected: true,
+		}, {
+			in:       "/foo/_bar/baz",
+			expected: false,
 		},
 	}
 	for _, tt := range tests {
-		got := isIgnoredByGo(tt.in, []string{"/"})
+		got := isIgnoredByGo(tt.in, []string{"/", "/foo/_bar/baz"})
 		if want := tt.expected; got != want {
 			t.Errorf("isIgnoredByGoBuild(%q) = %v; want %v", tt.in, got, want)
 		}
