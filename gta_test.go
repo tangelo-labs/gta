@@ -651,6 +651,25 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		testChangedPackages(t, diff, nil, want)
 	})
+
+	t.Run("change non-go file", func(t *testing.T) {
+		diff := map[string]Directory{
+			"embed":      {Exists: true, Files: []string{"README.md"}},
+			"unimported": {Exists: true, Files: []string{"unimported.go"}},
+		}
+
+		want := &Packages{
+			Dependencies: map[string][]Package{},
+			Changes: []Package{
+				{ImportPath: "unimported", Dir: "unimported"},
+			},
+			AllChanges: []Package{
+				{ImportPath: "unimported", Dir: "unimported"},
+			},
+		}
+
+		testChangedPackages(t, diff, nil, want)
+	})
 }
 
 func TestGTA_Prefix(t *testing.T) {
