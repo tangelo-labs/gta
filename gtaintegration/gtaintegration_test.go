@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"go/build"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -792,7 +791,7 @@ func abs(path string) string {
 }
 
 func prepareTemp() string {
-	d, err := ioutil.TempDir("", "gta-integration-tests")
+	d, err := os.MkdirTemp("", "gta-integration-tests")
 	if err != nil {
 		panic(err)
 	}
