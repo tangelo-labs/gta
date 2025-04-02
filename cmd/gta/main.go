@@ -15,7 +15,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -113,7 +112,7 @@ func stringify(pkgs []gta.Package, validOnly bool) []string {
 }
 
 func changedFiles(fn string) ([]string, error) {
-	b, err := ioutil.ReadFile(fn)
+	b, err := os.ReadFile(fn)
 	if err != nil {
 		return nil, err
 	}
