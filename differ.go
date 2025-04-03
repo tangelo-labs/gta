@@ -138,7 +138,7 @@ func (d *differ) DiffFiles() (map[string]bool, error) {
 }
 
 func (g *git) getMergeParents() (parent1 string, rightwardParents []string, err error) {
-	out, err := exec.Command("git", "log", "-1", "--pretty=format:%p").Output()
+	out, err := execWithStderr(exec.Command("git", "log", "-1", "--pretty=format:%p"))
 	if err != nil {
 		return
 	}
@@ -153,7 +153,7 @@ func (g *git) getMergeParents() (parent1 string, rightwardParents []string, err 
 	}
 
 	// for squash-merge/rebase commits, get the most recent merge commit hash and use as left parent
-	out, err = exec.Command("git", "log", "-1", "--merges", "--pretty=format:%h").Output()
+	out, err = execWithStderr(exec.Command("git", "log", "-1", "--merges", "--pretty=format:%h"))
 	if err != nil {
 		return
 	}
@@ -167,7 +167,7 @@ func (g *git) diff() (map[string]struct{}, error) {
 	g.onceDiff.Do(func() {
 		files, err := func() (map[string]struct{}, error) {
 			// We get the root of the repository to build our full path.
-			out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
+			out, err := execWithStderr(exec.Command("git", "rev-parse", "--show-toplevel"))
 			if err != nil {
 				return nil, err
 			}
@@ -280,7 +280,7 @@ func (g *git) branchPointOf(branch string) (string, error) {
 	// result when g.baseBranch had been merged into branch sometime after branch
 	// was created from g.baseBranch. In such a case, the merge base would be the
 	// the merge commit where g.baseBranch was merged into branch.
-	out, err := exec.Command("git", "rev-list", "--topo-order", "--parents", "--reverse", branch, "^"+g.baseBranch).Output()
+	out, err := execWithStderr(exec.Command("git", "rev-list", "--topo-order", "--parents", "--reverse", branch, "^"+g.baseBranch))
 	if err != nil {
 		return "", nil
 	}
@@ -297,4 +297,14 @@ func (g *git) branchPointOf(branch string) (string, error) {
 
 type fileDiffer struct {
 	changedFiles map[string]struct{}
+}
+
+func execWithStderr(c *exec.Cmd) (out []byte, err error) {
+	var stderr strings.Builder
+	c.Stderr = &stderr
+	out, err = c.Output()
+	if err != nil {
+		err = fmt.Errorf("%w: %s", err, stderr.String())
+	}
+	return
 }
