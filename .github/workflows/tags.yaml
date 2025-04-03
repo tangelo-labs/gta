@@ -1,0 +1,26 @@
+name: update tags
+on:
+  push:
+    tags: ['v*.*.*']
+    branches-ignore: ['**']
+jobs:
+  update-reftags:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run shell command
+        shell: bash
+        run: |
+          # Parse the MAJOR/MINOR version from the input tag.
+          MINOR="${GITHUB_REF_NAME%.*}"                # v1.2
+          MAJOR="${MINOR%.*}"                          # v1
+
+          # Update tags.
+          git tag -f "${MAJOR}"
+          git tag -f "${MINOR}"
+
+          # Push
+          git push --force origin --tags
