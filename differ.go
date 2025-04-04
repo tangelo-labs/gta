@@ -167,8 +167,7 @@ func (g *git) diff() (map[string]struct{}, error) {
 	g.onceDiff.Do(func() {
 		files, err := func() (map[string]struct{}, error) {
 			// We get the root of the repository to build our full path.
-			cmd := exec.Command("git", "rev-parse", "--show-toplevel")
-			out, err := cmd.CombinedOutput()
+			out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output()
 			if err != nil {
 				return nil, err
 			}
