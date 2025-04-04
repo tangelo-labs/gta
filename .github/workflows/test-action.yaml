@@ -1,0 +1,84 @@
+name: Test GTA Action
+
+on:
+  pull_request:
+    paths:
+      - 'action.yaml'
+      - 'entrypoint.sh'
+      - 'Dockerfile'
+      - '.github/workflows/test-action.yaml'
+      - '**/*.go'
+
+jobs:
+  test-action:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.24
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup test git Repository
+        run: |
+          echo "Creating repo in ./test-repo"
+          mkdir -p ./test-repo/src
+          cp -r ./testdata/* ./test-repo/src
+
+          cd ./test-repo/src/gtatest
+
+          go mod init gta.test
+          go mod tidy
+
+          # Initialize a new Git repository with the master branch
+          git init -b master
+
+          # Configure Git user and email
+          git config --global user.email "gtatest@example.com"
+          git config --global user.name "gta test"
+
+          # Add a dummy file to the repository
+          echo "Initial content" > dummy.txt
+          git add .
+
+          # Commit the changes
+          git commit -m "initial commit"
+
+          # Create a feature branch with changes
+          git checkout -b feature-branch
+
+          echo -e "\nconst baz = \"buzz\"\n" >> foo/foo.go
+          
+          git add .
+
+          git commit -m "update pkg foo"
+
+          echo "Repository setup successful."
+
+      - name: Run GTA Action
+        id: gta
+        uses: ./
+        with:
+            repo_path: ${{ github.workspace }}/test-repo/src/gtatest
+            base: "master"
+
+      - name: Validate output
+        run: |
+          expected="gta.test/foo gta.test/fooclient gta.test/fooclientclient"
+          actual="${{ steps.gta.outputs.changed_packages }}"
+          if [ "$actual" != "$expected" ]; then
+            echo "Error: Changed packages do not match expected."
+            echo "Expected: $expected"
+            echo "Actual: $actual"
+            exit 1
+          fi
+
+          if [ "${{ steps.gta.outputs.any_changed }}" != "true" ]; then
+            echo "Error: any_changed should be true"
+            exit 1
+          fi
+
+          echo "Validation successful"
