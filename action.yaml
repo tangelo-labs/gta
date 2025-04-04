@@ -59,10 +59,7 @@ runs:
       id: gta
       run: |
         cd "${{ inputs.repo_path }}"
-
         pwd
-
-        set -x
 
         flags=""
 
