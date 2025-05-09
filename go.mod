@@ -1,4 +1,4 @@
-module github.com/digitalocean/gta
+module github.com/tangelo-labs/gta
 
 go 1.24
 

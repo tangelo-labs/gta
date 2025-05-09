@@ -17,7 +17,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/digitalocean/gta"
+	"github.com/tangelo-labs/gta"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/pkg/errors"
