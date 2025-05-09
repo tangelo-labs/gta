@@ -47,17 +47,11 @@ func SetBaseBranch(baseBranch string) GitDifferOption {
 	}
 }
 
-// SetUseHeadToHead sets the useHeadToHead field on a git differ
-func SetUseHeadToHead(useHeadToHead bool) GitDifferOption {
-	return func(gd *git) {
-		gd.useHeadToHead = useHeadToHead
-	}
-}
-
 // NewGitDiffer returns a Differ that determines differences using git.
 func NewGitDiffer(opts ...GitDifferOption) Differ {
 	g := &git{
-		baseBranch: "origin/master",
+		useMergeCommit: false,
+		baseBranch:     "origin/master",
 	}
 
 	for _, opt := range opts {
@@ -91,7 +85,6 @@ type differ struct {
 type git struct {
 	baseBranch     string
 	useMergeCommit bool
-	useHeadToHead  bool
 	onceDiff       sync.Once
 	changedFiles   map[string]struct{}
 	diffErr        error
@@ -174,14 +167,32 @@ func (g *git) diff() (map[string]struct{}, error) {
 	g.onceDiff.Do(func() {
 		files, err := func() (map[string]struct{}, error) {
 			// We get the root of the repository to build our full path.
-			root, err := g.root()
+			out, err := execWithStderr(exec.Command("git", "rev-parse", "--show-toplevel"))
+			if err != nil {
+				return nil, err
+			}
+			root := strings.TrimSpace(string(out))
+			// get the revision from which HEAD was branched from g.baseBranch.
+			parent1, err := g.branchPointOf("HEAD")
 			if err != nil {
 				return nil, err
 			}
 
-			parent1, rightwardParents, err := g.getParents()
-			if err != nil {
-				return nil, fmt.Errorf("git differ failed to get branch parents when getting go.mod dependency changes: %w", err)
+			// If the branch point is unknown, fall back to using the base branch. In
+			// most cases, this will be fine, but results in a corner case when base
+			// branch has been merged into the branch since branch was created. In
+			// that case, the differences from the base branch and the most recent
+			// merge will not be considered.
+			if parent1 == "" {
+				parent1 = g.baseBranch
+			}
+
+			rightwardParents := []string{"HEAD"}
+			if g.useMergeCommit {
+				parent1, rightwardParents, err = g.getMergeParents()
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			files := make(map[string]struct{})
@@ -223,52 +234,6 @@ func (g *git) diff() (map[string]struct{}, error) {
 	})
 
 	return g.changedFiles, g.diffErr
-}
-
-func (g *git) getParents() (parent1 string, rightwardParents []string, errR error) {
-	parent1 = g.baseBranch
-	rightwardParents = []string{"HEAD"}
-
-	// When HeadToHead is not set, vanilla behavior. Get root commit when the branch was created from the base as the parent.
-	if !g.useHeadToHead {
-		// get the revision from which HEAD was branched from g.baseBranch.
-		resParent1, err := g.branchPointOf("HEAD")
-		if err != nil {
-			errR = err
-
-			return
-		}
-
-		// If the branch point is unknown, fall back to using the base branch. In
-		// most cases, this will be fine, but results in a corner case when base
-		// branch has been merged into the branch since branch was created. In
-		// that case, the differences from the base branch and the most recent
-		// merge will not be considered.
-		if resParent1 != "" {
-			parent1 = resParent1
-		}
-	}
-
-	if g.useMergeCommit {
-		resParent1, resRightwardParents, err := g.getMergeParents()
-		if err != nil {
-			errR = err
-			return
-		}
-
-		parent1, rightwardParents = resParent1, resRightwardParents
-	}
-
-	return
-}
-
-func (g *git) root() (string, error) {
-	out, err := execWithStderr(exec.Command("git", "rev-parse", "--show-toplevel"))
-	if err != nil {
-		return "", err
-	}
-
-	return strings.TrimSpace(string(out)), nil
 }
 
 // diffPaths returns the path that have changed.
