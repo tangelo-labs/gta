@@ -372,6 +372,17 @@ func (g *GTA) markedPackages() (map[string]map[string]bool, error) {
 		}
 	}
 
+	//
+	depChanges, err := g.differ.DiffGoModDeps()
+	if err != nil {
+		return nil, fmt.Errorf("diffing go.mod dependencies, %w", err)
+	}
+	for dep := range depChanges {
+		if _, ok := changed[dep]; !ok {
+			changed[dep] = false
+		}
+	}
+
 	// do not assume that only tests are affected if the package's embedded files
 	// were changed. We do not have enough information to know whether the
 	// embedded files are exclusively used by the tests, so assume that are used

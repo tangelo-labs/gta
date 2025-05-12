@@ -24,11 +24,16 @@ import (
 var _ Differ = &testDiffer{}
 
 type testDiffer struct {
-	diff map[string]Directory
+	diff     map[string]Directory
+	depsDiff map[string]struct{}
 }
 
 func (t *testDiffer) Diff() (map[string]Directory, error) {
 	return t.diff, nil
+}
+
+func (t *testDiffer) DiffGoModDeps() (map[string]struct{}, error) {
+	return t.depsDiff, nil
 }
 
 func (t *testDiffer) DiffFiles() (map[string]bool, error) {
@@ -88,7 +93,7 @@ func TestGTA(t *testing.T) {
 	// dirC is dirty, we expect them all to be marked
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			"dirC": Directory{
+			"dirC": {
 				Exists: true,
 				Files:  []string{"foo.go"},
 			},
@@ -97,10 +102,10 @@ func TestGTA(t *testing.T) {
 
 	graph := &Graph{
 		graph: map[string]map[string]bool{
-			"C": map[string]bool{
+			"C": {
 				"B": true,
 			},
-			"B": map[string]bool{
+			"B": {
 				"A": true,
 			},
 		},
@@ -116,9 +121,9 @@ func TestGTA(t *testing.T) {
 		errs:  make(map[string]error),
 	}
 	want := []Package{
-		Package{ImportPath: "A"},
-		Package{ImportPath: "B"},
-		Package{ImportPath: "C"},
+		{ImportPath: "A"},
+		{ImportPath: "B"},
+		{ImportPath: "C"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
@@ -146,24 +151,24 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		difr := &testDiffer{
 			diff: map[string]Directory{
-				"dirC": Directory{Exists: true, Files: []string{"c.go"}},
-				"dirH": Directory{Exists: true, Files: []string{"h.go"}},
+				"dirC": {Exists: true, Files: []string{"c.go"}},
+				"dirH": {Exists: true, Files: []string{"h.go"}},
 			},
 		}
 
 		graph := &Graph{
 			graph: map[string]map[string]bool{
-				"C": map[string]bool{
+				"C": {
 					"B": true,
 				},
-				"B": map[string]bool{
+				"B": {
 					"A": true,
 					"D": true,
 				},
-				"G": map[string]bool{
+				"G": {
 					"F": true,
 				},
-				"F": map[string]bool{
+				"F": {
 					"E": true,
 				},
 			},
@@ -185,12 +190,12 @@ func TestGTA_ChangedPackages(t *testing.T) {
 
 		want := &Packages{
 			Dependencies: map[string][]Package{
-				"C": []Package{
+				"C": {
 					{ImportPath: "A"},
 					{ImportPath: "B"},
 					{ImportPath: "D"},
 				},
-				"G": []Package{
+				"G": {
 					{ImportPath: "E"},
 					{ImportPath: "F"},
 				},
@@ -678,27 +683,27 @@ func TestGTA_Prefix(t *testing.T) {
 	// C depends on qux
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			"dirB":   Directory{Exists: true},
-			"dirC":   Directory{Exists: true},
-			"dirFoo": Directory{Exists: true},
+			"dirB":   {Exists: true},
+			"dirC":   {Exists: true},
+			"dirFoo": {Exists: true},
 		},
 	}
 
 	graph := &Graph{
 		graph: map[string]map[string]bool{
-			"C": map[string]bool{
+			"C": {
 				"B": true,
 			},
-			"B": map[string]bool{
+			"B": {
 				"A": true,
 			},
-			"foo": map[string]bool{
+			"foo": {
 				"A": true,
 			},
-			"bar": map[string]bool{
+			"bar": {
 				"B": true,
 			},
-			"qux": map[string]bool{
+			"qux": {
 				"C": true,
 			},
 		},
@@ -717,8 +722,8 @@ func TestGTA_Prefix(t *testing.T) {
 		errs:  make(map[string]error),
 	}
 	want := []Package{
-		Package{ImportPath: "C"},
-		Package{ImportPath: "foo"},
+		{ImportPath: "C"},
+		{ImportPath: "foo"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr), SetPrefixes("foo", "C"))
@@ -743,7 +748,7 @@ func TestNoBuildableGoFiles(t *testing.T) {
 	const dir = "docs"
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			dir: Directory{},
+			dir: {},
 		},
 	}
 
@@ -783,20 +788,20 @@ func TestSpecialCaseDirectory(t *testing.T) {
 	)
 	difr := &testDiffer{
 		diff: map[string]Directory{
-			special1: Directory{Exists: true},
-			special2: Directory{Exists: true},
-			"dirC":   Directory{Exists: true, Files: []string{"c.go"}},
+			special1: {Exists: true},
+			special2: {Exists: true},
+			"dirC":   {Exists: true, Files: []string{"c.go"}},
 		},
 	}
 	graph := &Graph{
 		graph: map[string]map[string]bool{
-			"C": map[string]bool{
+			"C": {
 				"B": true,
 			},
-			"B": map[string]bool{
+			"B": {
 				"A": true,
 			},
-			"specia/case": map[string]bool{
+			"specia/case": {
 				"D": true,
 			},
 		},
@@ -822,10 +827,10 @@ func TestSpecialCaseDirectory(t *testing.T) {
 	}
 
 	want := []Package{
-		Package{ImportPath: "A"},
-		Package{ImportPath: "B"},
-		Package{ImportPath: "C"},
-		Package{ImportPath: "specia/case"},
+		{ImportPath: "A"},
+		{ImportPath: "B"},
+		{ImportPath: "C"},
+		{ImportPath: "specia/case"},
 	}
 
 	gta, err := New(SetDiffer(difr), SetPackager(pkgr))
@@ -848,7 +853,7 @@ func TestSpecialCaseDirectory(t *testing.T) {
 func TestUnmarshalJSON(t *testing.T) {
 	want := &Packages{
 		Dependencies: map[string][]Package{
-			"do/tools/build/gta": []Package{
+			"do/tools/build/gta": {
 				{
 					ImportPath: "do/tools/build/gta/cmd/gta",
 				},
@@ -885,7 +890,7 @@ func TestUnmarshalJSON(t *testing.T) {
 func TestJSONRoundtrip(t *testing.T) {
 	want := &Packages{
 		Dependencies: map[string][]Package{
-			"do/tools/build/gta": []Package{
+			"do/tools/build/gta": {
 				{
 					ImportPath: "do/tools/build/gta/cmd/gta",
 				},
