@@ -28,6 +28,9 @@ type Differ interface {
 	// DiffFiles returns a map whose keys are absolute files paths. A map value
 	// is true when the file exists.
 	DiffFiles() (map[string]bool, error)
+
+	// DiffGoModDeps returns a map of dependencies that have been changed in go.mod.
+	DiffGoModDeps() (map[string]struct{}, error)
 }
 
 // GitDifferOption is an option function used to modify a git differ
@@ -65,7 +68,8 @@ func NewGitDiffer(opts ...GitDifferOption) Differ {
 	}
 
 	return &differ{
-		diff: g.diff,
+		diff:     g.diff,
+		depsDiff: g.fetchGoModDepChanges,
 	}
 }
 
@@ -79,12 +83,14 @@ func NewFileDiffer(files []string) Differ {
 	}
 
 	return &differ{
-		diff: func() (map[string]struct{}, error) { return m, nil },
+		diff:     func() (map[string]struct{}, error) { return m, nil },
+		depsDiff: func() (map[string]struct{}, error) { return make(map[string]struct{}), nil },
 	}
 }
 
 type differ struct {
-	diff func() (map[string]struct{}, error)
+	diff     func() (map[string]struct{}, error)
+	depsDiff func() (map[string]struct{}, error)
 }
 
 // git implements the Differ interface using a git version control method.
@@ -142,6 +148,11 @@ func (d *differ) DiffFiles() (map[string]bool, error) {
 	}
 
 	return existsFiles, nil
+}
+
+// DiffGoModDeps returns a set of changed dependencies in go.mod.
+func (d *differ) DiffGoModDeps() (map[string]struct{}, error) {
+	return d.depsDiff()
 }
 
 func (g *git) getMergeParents() (parent1 string, rightwardParents []string, err error) {
@@ -223,6 +234,64 @@ func (g *git) diff() (map[string]struct{}, error) {
 	})
 
 	return g.changedFiles, g.diffErr
+}
+
+func (g *git) fetchGoModDepChanges() (map[string]struct{}, error) {
+	filesChanged, err := g.diff()
+	if err != nil {
+		return nil, fmt.Errorf("git differ failed to get files changed when getting go.mod dependency changes: %w", err)
+	}
+
+	// We get the root of the repository to build our full path.
+	root, err := g.root()
+	if err != nil {
+		return nil, fmt.Errorf("git differ failed to get root path when getting go.mod dependency changes: %w", err)
+	}
+
+	// Get the absolute path of go.mod
+	goModPath, err := filepath.Abs(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return nil, fmt.Errorf("git differ failed to get absolute path of go.mod when getting go.mod dependency changes: %w", err)
+	}
+
+	// Look up if go.mod is in the changed files
+	_, found := filesChanged[goModPath]
+	if !found {
+		return map[string]struct{}{}, nil
+	}
+
+	parent1, rightwardParents, err := g.getParents()
+	if err != nil {
+		return nil, fmt.Errorf("git differ failed to get branch parents when getting go.mod dependency changes: %w", err)
+	}
+
+	changes := make(map[string]struct{})
+
+	// Loop the commit parents to get all deps changed in go.mod
+	for _, parent2 := range rightwardParents {
+		// get go.mod changes
+		out, err := execWithStderr(exec.Command("git", "--no-pager", "diff", "--unified=0", fmt.Sprintf("%s...%s", parent1, parent2), "go.mod"))
+		if err != nil {
+			return nil, fmt.Errorf("git differ failed to go.mod when getting go.mod dependency changes: %w", err)
+		}
+
+		lines := strings.Split(string(out), "\n")
+		for _, line := range lines {
+			changeDetected := strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++")
+
+			if changeDetected {
+				if dep, ok := isDependency(line); ok {
+					changes[dep] = struct{}{}
+				}
+
+				if rep, ok := isReplace(line); ok {
+					changes[rep] = struct{}{}
+				}
+			}
+		}
+	}
+
+	return changes, nil
 }
 
 func (g *git) getParents() (parent1 string, rightwardParents []string, errR error) {
@@ -328,6 +397,42 @@ func (g *git) branchPointOf(branch string) (string, error) {
 	}
 	branchPoint := ancestors[1]
 	return branchPoint, nil
+}
+
+func isDependency(line string) (string, bool) {
+	line = strings.TrimSpace(line)
+
+	parts := strings.Fields(line)
+	if len(parts) == 3 {
+		return parts[0], true
+	}
+
+	if strings.HasPrefix(line, "replace ") {
+		line = strings.TrimSpace(strings.ReplaceAll(line, "replace ", ""))
+		parts := strings.Fields(line)
+
+		return parts[0], true
+	}
+
+	return "", false
+}
+
+func isReplace(line string) (string, bool) {
+	line = strings.TrimSpace(line)
+
+	parts := strings.Split(line, "=>")
+	if len(parts) == 2 {
+		return parts[0], true
+	}
+
+	if strings.HasPrefix(line, "replace ") {
+		line = strings.TrimSpace(strings.ReplaceAll(line, "replace ", ""))
+		parts := strings.Split(line, "=>")
+
+		return parts[0], true
+	}
+
+	return "", false
 }
 
 type fileDiffer struct {
